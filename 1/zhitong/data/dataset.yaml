@@ -1,0 +1,7 @@
+path: E:\output\1\zhitong\data\processed_frames
+train: images/train
+val: images/val
+test: images/test
+
+nc: 3
+names: ['no_helmet', 'red_light', 'wrong_way']

@@ -1,0 +1,23 @@
+{
+  "test_no_helmet": {
+    "file_path": "E:\\output\\1\\zhitong\\data\\raw_videos\\test_no_helmet.mp4",
+    "violation_type": "no_helmet",
+    "processed": true,
+    "processed_frames": 0,
+    "timestamp": "2026-06-09T10:47:26.113606"
+  },
+  "test_red_light": {
+    "file_path": "E:\\output\\1\\zhitong\\data\\raw_videos\\test_red_light.mp4",
+    "violation_type": "red_light",
+    "processed": true,
+    "processed_frames": 23,
+    "timestamp": "2026-06-09T10:47:26.431371"
+  },
+  "test_wrong_way": {
+    "file_path": "E:\\output\\1\\zhitong\\data\\raw_videos\\test_wrong_way.mp4",
+    "violation_type": "wrong_way",
+    "processed": true,
+    "processed_frames": 22,
+    "timestamp": "2026-06-09T10:47:26.752553"
+  }
+}
