@@ -1,0 +1,72 @@
+<!--pages/list/list.wxml-->
+<view class="container">
+  <!-- 筛选区 -->
+  <view class="filter-section">
+    <view class="filter-item">
+      <picker mode="selector" range="{{typeOptions}}" range-key="label" bindchange="onTypeChange">
+        <view class="picker-value">
+          {{filterType ? typeOptions[typeIndex].label : '全部类型'}}
+          <text class="arrow">▼</text>
+        </view>
+      </picker>
+    </view>
+    <view class="filter-item">
+      <picker mode="selector" range="{{statusOptions}}" range-key="label" bindchange="onStatusChange">
+        <view class="picker-value">
+          {{filterStatus ? statusOptions[statusIndex].label : '全部状态'}}
+          <text class="arrow">▼</text>
+        </view>
+      </picker>
+    </view>
+  </view>
+
+  <!-- 记录列表 -->
+  <view class="list-container">
+    <block wx:if="{{items.length > 0}}">
+      <view
+        class="card record-card"
+        wx:for="{{items}}"
+        wx:key="id"
+        bindtap="goToDetail"
+        data-id="{{item.id}}"
+      >
+        <view class="record-content">
+          <view class="record-image">
+            <image
+              src="{{item.image_path ? baseUrl + '/' + item.image_path : defaultImage}}"
+              mode="aspectFill"
+              binderror="onImageError"
+              data-index="{{index}}"
+            />
+          </view>
+          <view class="record-info">
+            <view class="record-header">
+              <text class="badge-{{item.violation_type}}">{{item.violation_type_name}}</text>
+              <text class="badge-{{item.status}}">{{item.status_name}}</text>
+            </view>
+            <view class="record-time">{{item.created_at}}</view>
+            <view class="record-meta" wx:if="{{item.confidence}}">
+              置信度: {{item.confidence}}
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 加载更多 -->
+      <view class="load-more" wx:if="{{hasMore}}">
+        <text wx:if="{{!loading}}">上拉加载更多</text>
+        <text wx:if="{{loading}}">加载中...</text>
+      </view>
+      <view class="no-more" wx:if="{{!hasMore && items.length > 0}}">
+        <text>没有更多了</text>
+      </view>
+    </block>
+
+    <!-- 空状态 -->
+    <view class="empty" wx:if="{{!loading && items.length === 0}}">
+      <text class="empty-icon">📋</text>
+      <text class="empty-text">暂无举报记录</text>
+      <view class="empty-btn" bindtap="goToSubmit">去举报</view>
+    </view>
+  </view>
+</view>

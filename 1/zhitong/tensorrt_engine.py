@@ -17,6 +17,13 @@ try:
 except ImportError:
     ULTRALYTICS_AVAILABLE = False
 
+# CUDA 相关导入（可选）
+try:
+    import cuda
+    CUDA_AVAILABLE = True
+except ImportError:
+    CUDA_AVAILABLE = False
+
 class TensorRTEngine:
     def __init__(self, config: Config):
         self.config = config
@@ -26,7 +33,7 @@ class TensorRTEngine:
         self.outputs = []
         self.bindings = []
         self.stream = None
-        self.tensorrt_available = TENSORRT_AVAILABLE
+        self.tensorrt_available = TENSORRT_AVAILABLE and CUDA_AVAILABLE
         self.ultralytics_available = ULTRALYTICS_AVAILABLE
         
         self.logger = trt.Logger(trt.Logger.WARNING) if self.tensorrt_available else None
@@ -34,6 +41,25 @@ class TensorRTEngine:
         self.model = None
         if self.ultralytics_available:
             self._load_ultralytics_model()
+        
+        # 自动尝试加载 TensorRT engine
+        self._auto_load_engine()
+    
+    def _auto_load_engine(self):
+        """自动检测并加载 TensorRT engine"""
+        if self.ultralytics_available and self.tensorrt_available:
+            engine_path = os.path.join(self.config.MODEL_DIR, 'yolov8n.engine')
+            if os.path.exists(engine_path):
+                success = self.load_tensorrt_engine(engine_path)
+                if success:
+                    print(f"✓ TensorRT engine loaded: {engine_path}")
+                    self.config.USE_TENSORRT = True
+                else:
+                    print("⚠ TensorRT engine load failed, using PyTorch")
+                    self.config.USE_TENSORRT = False
+            else:
+                print(f"ℹ TensorRT engine not found at {engine_path}, using PyTorch")
+                self.config.USE_TENSORRT = False
     
     def _load_ultralytics_model(self):
         model_path = os.path.join(self.config.MODEL_DIR, self.config.YOLO_MODEL)
@@ -56,6 +82,7 @@ class TensorRTEngine:
         return True
     
     def load_tensorrt_engine(self, engine_path=None):
+        """加载 TensorRT engine"""
         if not self.tensorrt_available:
             print("TensorRT not available, using PyTorch inference")
             return False
@@ -67,28 +94,17 @@ class TensorRTEngine:
             print("TensorRT engine not found, using PyTorch inference")
             return False
         
-        print(f"Loading TensorRT engine: {engine_path}")
-        
-        with open(engine_path, 'rb') as f:
-            runtime = trt.Runtime(self.logger)
-            self.engine = runtime.deserialize_cuda_engine(f.read())
-            self.context = self.engine.create_execution_context()
-        
-        for binding in self.engine:
-            size = trt.volume(self.engine.get_binding_shape(binding))
-            dtype = trt.nptype(self.engine.get_binding_dtype(binding))
-            host_mem = cuda.pagelocked_empty(size, dtype)
-            device_mem = cuda.mem_alloc(host_mem.nbytes)
-            self.bindings.append(int(device_mem))
-            if self.engine.binding_is_input(binding):
-                self.inputs.append({'host': host_mem, 'device': device_mem})
-            else:
-                self.outputs.append({'host': host_mem, 'device': device_mem})
-        
-        self.stream = cuda.Stream()
-        self.config.USE_TENSORRT = True
-        print("TensorRT engine loaded successfully")
-        return True
+        try:
+            print(f"Loading TensorRT engine: {engine_path}")
+            # 使用 ultralytics 的 TRT 模型加载
+            self.model = YOLO(engine_path)
+            self.config.USE_TENSORRT = True
+            print("TensorRT engine loaded successfully")
+            return True
+        except Exception as e:
+            print(f"TensorRT engine load failed: {e}")
+            self.config.USE_TENSORRT = False
+            return False
     
     def preprocess(self, img):
         img = cv2.resize(img, (640, 640))

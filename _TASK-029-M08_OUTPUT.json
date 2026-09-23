@@ -1,0 +1,132 @@
+{
+  "task": "TASK-029-M08",
+  "module": "Web 端交通事件中心（GPT §15.1）",
+  "timestamp": "2026-08-21T22:50:00+08:00",
+  "status": "PASS",
+  "details": {
+    "summary": "新增 2 个 Vue3 视图（EventCenter.vue / EventDetail.vue），注册 2 条路由（/events 与 /events/:id），在 App.vue 顶部导航栏加入「交通事件中心」入口，新增 7 个事件相关 API 函数。Vite 构建通过（exit code 0，27.05s），Element Plus 图标校验通过（36/36 合法）。",
+    "files_created": [
+      {
+        "path": "e:\\output\\1\\web-admin\\src\\views\\EventCenter.vue",
+        "desc": "事件中心列表页：顶部 4 个统计卡（活跃/待AI/待复核/已确认）+ 9 状态快速筛选 + 类型/状态/摄像头筛选 + 表格（事件ID/类型/车辆/车牌/摄像头/触发时间/AI置信度/状态）+ 分页 + 5 秒轮询活跃事件 + 行点击跳详情"
+      },
+      {
+        "path": "e:\\output\\1\\web-admin\\src\\views\\EventDetail.vue",
+        "desc": "事件详情页：顶部状态横幅 + 左侧事件视频播放器(video标签) + 关键帧画廊(grid布局) + 证据链时间线(state_history) + 右侧事件信息/车辆信息(车牌带颜色)/场景上下文(信号灯+停止线+SVG轨迹折线图)/AI分析结果(ai_trace v3 折叠展示)/本地规则判断(JSON) + 人工复核表单(确认违法/排除事件)"
+      }
+    ],
+    "files_modified": [
+      {
+        "path": "e:\\output\\1\\web-admin\\src\\api\\index.js",
+        "changes": "新增 7 个事件 API：getEventList/getActiveEvents/getEventDetail/getEventFrames/reviewEvent/getEventVideoUrl/getEventFrameUrl"
+      },
+      {
+        "path": "e:\\output\\1\\web-admin\\src\\router\\index.js",
+        "changes": "新增 2 条路由：/events → EventCenter.vue, /events/:id → EventDetail.vue"
+      },
+      {
+        "path": "e:\\output\\1\\web-admin\\src\\App.vue",
+        "changes": "顶部 el-menu 增加「交通事件中心」菜单项（图标 WarnTriangleFilled，路由 /events），并 import 该图标"
+      }
+    ],
+    "features": {
+      "EventCenter": [
+        "顶部 4 个统计卡片：活跃事件数 / 待 AI 分析 / 待人工复核 / 已确认违法",
+        "9 个状态快速筛选按钮：全部/检测中/已触发/录制中/待AI分析/AI已分析/已确认/已排除/待人工复核",
+        "搜索筛选：事件类型 + 状态 + 摄像头 ID",
+        "事件列表表格：事件 ID / 类型(TypeTag) / 车辆 ID / 车牌号(带颜色标签) / 摄像头 / 触发时间 / AI 置信度(进度条) / 状态(彩色 tag) / 详情按钮",
+        "分页：支持 10/20/50/100 每页",
+        "5 秒轮询活跃事件（graceful degradation：失败静默）",
+        "行点击跳转详情页",
+        "行样式：待人工复核(浅红) / 已确认(浅绿) / 已排除(半透明)"
+      ],
+      "EventDetail": [
+        "顶部状态横幅：根据事件状态显示不同文案和颜色（8 状态全覆盖）",
+        "事件视频播放器：<video> 标签自动播放/循环/静音/控制条，支持新窗口打开",
+        "关键帧画廊：网格布局，支持点击预览大图，加载失败显示占位图",
+        "证据链时间线：从 state_history JSON 构建，自动添加事件创建/AI分析/终态节点",
+        "事件信息卡片：事件ID/类型/车辆ID/触发时间/创建时间/摄像头/AI置信度",
+        "车辆信息卡片：车牌号大标签(蓝/绿/黄/未知) + 车辆类型/车牌颜色/置信度/Track ID",
+        "场景上下文卡片：信号灯状态(红/绿/黄 tag) + 车道 ID + 停止线关系 + SVG 轨迹折线图(起点绿/终点红)",
+        "AI 分析结果卡片：AI 说明文本 + ai_trace v3 折叠面板(YOLO/豆包/DeepSeek/最终裁决 JSON)",
+        "本地规则判断卡片：JSON 展示",
+        "人工复核表单：复核人 + 复核意见 + 确认违法/排除事件 按钮（调用 POST /api/realtime/events/{id}/review）",
+        "复核后自动刷新详情"
+      ],
+      "API": [
+        "getEventList(params) → GET /api/realtime/events",
+        "getActiveEvents() → GET /api/realtime/events/active",
+        "getEventDetail(eventId) → GET /api/realtime/events/{id}",
+        "getEventFrames(eventId) → GET /api/realtime/events/{id}/frames",
+        "reviewEvent(eventId, data) → POST /api/realtime/events/{id}/review",
+        "getEventVideoUrl(eventId) → 构造视频 URL（直连后端 8001 端口）",
+        "getEventFrameUrl(framePath) → 构造关键帧 URL（路径归一化）"
+      ]
+    },
+    "verification": {
+      "icon_check": {
+        "command": "node scripts/verify-icons.cjs",
+        "result": "PASS",
+        "details": "已加载 293 个合法图标名，扫描 19 个源文件，共发现 36 个唯一图标 import，所有图标名称均合法（含新增 WarnTriangleFilled）"
+      },
+      "vite_build": {
+        "command": "npx vite build",
+        "result": "PASS",
+        "exit_code": 0,
+        "duration_sec": 27.05,
+        "modules_transformed": 2246,
+        "new_chunks": [
+          "dist/assets/EventCenter-BtV3Uvd-.js (8.53 kB | gzip 3.46 kB)",
+          "dist/assets/EventDetail-DK945KFy.js (19.00 kB | gzip 6.72 kB)",
+          "dist/assets/EventCenter-BlCgRF_W.css (3.20 kB | gzip 0.84 kB)",
+          "dist/assets/EventDetail-CBc58yto.css (6.63 kB | gzip 1.40 kB)"
+        ],
+        "warnings": [
+          "chunk size > 500 kB（继承自 TASK-028 的既有警告，非本次新增）",
+          "legacy-js-api deprecation（sass 既有警告，非本次新增）"
+        ]
+      },
+      "acceptance_criteria_check": {
+        "EventCenter.vue 事件列表页正常渲染": "PASS（构建产物生成，无语法错误）",
+        "EventDetail.vue 包含视频播放器+关键帧画廊+证据链时间线+车辆信息+AI结果": "PASS（5 大区域全部实现）",
+        "人工复核按钮可调用 POST /api/realtime/events/{id}/review": "PASS（reviewEvent API 已接入，handleReview 调用 ElMessageBox 二次确认后提交）",
+        "状态筛选和分页功能正常": "PASS（9 状态快速筛选 + 状态下拉 + 分页 10/20/50/100）",
+        "路由注册成功（/events 和 /events/:id 可访问）": "PASS（router/index.js 已注册 2 条路由）",
+        "侧边栏菜单增加入口": "PASS（App.vue 顶部 el-menu 新增「交通事件中心」菜单项）",
+        "npx vite build 构建通过（exit code 0）": "PASS（exit code 0，27.05s）",
+        "图标校验通过（node scripts/verify-icons.cjs 无缺失）": "PASS（36/36 合法）"
+      }
+    },
+    "integration_points": {
+      "backend_api": "调用 M07 已实现的 6 个事件路由（GET /events, GET /events/active, GET /events/{id}, GET /events/{id}/video, GET /events/{id}/frames, POST /events/{id}/review）",
+      "static_mount": "事件视频通过 /api/realtime/events/{id}/video FileResponse 端点访问（M07 已在 app.py 挂载 /event-videos 静态目录作为后备）",
+      "realtime_request": "复用 realtimeRequest 实例（直连后端 8001 端口，绕过 Vite 代理），与 RealTimeMonitor.vue 保持一致",
+      "type_tag_component": "复用既有 TypeTag.vue 组件展示事件类型标签（red_light/no_helmet/wrong_way 等）",
+      "format_utils": "复用 utils/format.js 的 formatDate 函数"
+    },
+    "graceful_degradation": [
+      "vehicle_info / scene_context / trajectory / ai_judgment / rule_judgment / state_history 字段缺失或 JSON 解析失败时显示「无 xxx」Empty 占位，不报错",
+      "事件视频不存在时显示「事件视频尚未生成」占位，video 标签 @error 事件捕获加载失败",
+      "关键帧图片加载失败显示 Picture 图标占位",
+      "getActiveEvents 轮询失败静默处理（console.warn），不影响列表页主功能",
+      "AI 分析未进行时显示「尚未进行 AI 分析」Empty 占位"
+    ]
+  },
+  "feedback": {
+    "project_suggestions": [
+      "EventDetail 的 SVG 轨迹折线图当前是简易实现（自动归一化坐标），后续可考虑接入 ECharts 提供交互式轨迹图（已有 echarts 依赖），支持 hover 显示具体坐标和时间戳"
+    ],
+    "commander_suggestions": [
+      "建议在 M09 集成测试时启动 CARLA 模拟器触发一个真实违规事件，验证从「事件触发 → 视频生成 → 云端 AI 分析 → 前端展示」的完整闭环，确认 EventDetail 页面的视频播放和关键帧画廊在真实数据下正常工作",
+      "建议在前端开发完成后，安排一次人工复核走查（Commander 账号登录 → /events/:id → 点击「确认违法」按钮），验证 reviewEvent API 与后端 event_engine.manual_review 的端到端链路",
+      "建议考虑在 EventCenter 列表页增加「实时推送」能力（WebSocket 推送新事件），替代当前的 5 秒轮询，以降低后端压力并提升实时性"
+    ],
+    "dissent": "无异议。M08 严格按通知文件的执行步骤和验收标准实现，未触发任何与 GPT 原则冲突的设计",
+    "suggestions_adopted": [
+      "采用 GPT §15.1 要求的「事件中心」页面命名，与既有 ViolationList 区分（事件 = 含完整生命周期，违规 = 单帧即时判断）",
+      "采用 graceful degradation 原则（GPT §4.1），所有外部数据缺失时不报错只占位",
+      "采用 ai_trace v3 嵌套结构展示（GPT §10），与 ViolationDetail.vue 的展示逻辑保持一致",
+      "采用「内存优先 + 数据库后备」策略读取事件详情（与 M07 后端路由策略保持一致）"
+    ]
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "task": "TASK-029-M09-integration",
+  "timestamp": "2026-09-04T17:59:10.684283Z",
+  "total": 7,
+  "passed": 6,
+  "failed": 1,
+  "all_passed": false,
+  "results": [
+    {
+      "name": "CircularFrameBuffer 基本功能",
+      "passed": true,
+      "detail": "size=3, duration=0.0s, latest_len=1",
+      "error": "",
+      "timestamp": "2026-09-04T17:59:08.081185Z"
+    },
+    {
+      "name": "TrafficEventEngine 事件创建+状态转换",
+      "passed": true,
+      "detail": "states=['DETECTING', 'TRIGGERED', 'RECORDING', 'PENDING_AI', 'AI_REVIEWED', 'CONFIRMED', 'REJECTED', 'MANUAL_REVIEW'], methods_ok=True, state_changed=True",
+      "error": "",
+      "timestamp": "2026-09-04T17:59:08.084100Z"
+    },
+    {
+      "name": "EvidenceChain 从事件构建",
+      "passed": true,
+      "detail": "fields_ok=True, summary_ok=True, json_ok=True, plate=京A12345, final_status=confirmed",
+      "error": "",
+      "timestamp": "2026-09-04T17:59:08.087068Z"
+    },
+    {
+      "name": "CloudCollaborator.analyze_event 接口存在性",
+      "passed": true,
+      "detail": "params=['self', 'event_clip_frames', 'key_frames', 'vehicle_info', 'scene_context', 'event_type', 'trajectory'], missing=[], analyze_frame_still_exists=False",
+      "error": "",
+      "timestamp": "2026-09-04T17:59:10.286272Z"
+    },
+    {
+      "name": "RealtimeViolationDetector 集成检查",
+      "passed": true,
+      "detail": "frame_buffer=CircularFrameBuffer, event_engine=TrafficEventEngine, active_events=dict, methods_ok=True",
+      "error": "",
+      "timestamp": "2026-09-04T17:59:10.475958Z"
+    },
+    {
+      "name": "API 路由注册检查",
+      "passed": true,
+      "detail": "total_routes=34, required=6, missing=[]",
+      "error": "",
+      "timestamp": "2026-09-04T17:59:10.683005Z"
+    },
+    {
+      "name": "traffic_events 表存在检查",
+      "passed": false,
+      "detail": "",
+      "error": "数据库文件不存在: E:\\output\\1\\zhitong_violations.db",
+      "timestamp": "2026-09-04T17:59:10.684283Z"
+    }
+  ]
+}

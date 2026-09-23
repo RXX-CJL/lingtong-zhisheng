@@ -1,0 +1,148 @@
+<view class="container" wx:if="{{!loading && violation}}">
+  <!-- 状态卡片 -->
+  <view class="status-card">
+    <view class="status-type">{{violation.violation_type}}</view>
+    <view class="status-badge status-{{violation.status}}">
+      {{statusMap[violation.status]}}
+    </view>
+  </view>
+
+  <!-- 证据图片 -->
+  <view class="section" wx:if="{{violation.image_path}}">
+    <view class="section-title">违规证据</view>
+    <image 
+      class="evidence-image" 
+      src="{{violation.image_path}}" 
+      mode="widthFix"
+      bindtap="previewImage"
+      data-src="{{violation.image_path}}"
+    />
+  </view>
+
+  <!-- 详细信息 -->
+  <view class="section">
+    <view class="section-title">详细信息</view>
+    <view class="detail-list">
+      <view class="detail-item">
+        <text class="detail-label">违规类型</text>
+        <text class="detail-value">{{violation.violation_type}}</text>
+      </view>
+      <view class="detail-item">
+        <text class="detail-label">检测置信度</text>
+        <text class="detail-value highlight">{{(violation.confidence * 100).toFixed(1)}}%</text>
+      </view>
+      <view class="detail-item">
+        <text class="detail-label">违规时间</text>
+        <text class="detail-value">{{violation.timestamp}}</text>
+      </view>
+      <view class="detail-item" wx:if="{{violation.position}}">
+        <text class="detail-label">位置信息</text>
+        <text class="detail-value">{{violation.position}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- AI分析结果 -->
+  <view class="section" wx:if="{{violation.yolo_detection_result}}">
+    <view class="section-title">AI分析结果</view>
+    <view class="ai-result">
+      <text>{{violation.yolo_detection_result}}</text>
+    </view>
+  </view>
+
+  <!-- AI协作过程 -->
+  <view class="section" wx:if="{{aiTrace}}">
+    <view class="section-title">AI协作过程</view>
+    
+    <!-- 协作模式标签 -->
+    <view class="collab-mode">
+      <view class="mode-badge mode-{{aiTrace.mode}}">{{modeText[aiTrace.mode]}}</view>
+      <view class="session-id">会话: {{aiTrace.session_id}}</view>
+    </view>
+
+    <!-- 协作时间线 -->
+    <view class="timeline">
+      <!-- 本地检测 -->
+      <view class="timeline-item">
+        <view class="timeline-dot local"></view>
+        <view class="timeline-content">
+          <view class="timeline-title">本地YOLO检测</view>
+          <view class="timeline-detail">
+            置信度: {{(aiTrace.yolo.confidence * 100).toFixed(1)}}%
+          </view>
+          <view class="timeline-detail" wx:if="{{aiTrace.yolo.duration_ms}}">
+            耗时: {{aiTrace.yolo.duration_ms}}ms
+          </view>
+        </view>
+      </view>
+
+      <!-- 豆包分析 -->
+      <view class="timeline-item" wx:if="{{aiTrace.doubao}}">
+        <view class="timeline-dot cloud"></view>
+        <view class="timeline-content">
+          <view class="timeline-title">豆包视觉分析</view>
+          <view class="timeline-detail">
+            判定: {{aiTrace.doubao.judgment === 'confirmed' ? '确认违规' : aiTrace.doubao.judgment === 'rejected' ? '未违规' : '不确定'}}
+          </view>
+          <view class="timeline-detail">
+            置信度: {{(aiTrace.doubao.confidence * 100).toFixed(1)}}%
+          </view>
+          <view class="timeline-detail" wx:if="{{aiTrace.doubao.reasoning}}">
+            分析: {{aiTrace.doubao.reasoning}}
+          </view>
+        </view>
+      </view>
+
+      <!-- DeepSeek审核 -->
+      <view class="timeline-item" wx:if="{{aiTrace.deepseek}}">
+        <view class="timeline-dot review"></view>
+        <view class="timeline-content">
+          <view class="timeline-title">DeepSeek逻辑审核</view>
+          <view class="timeline-detail">
+            判定: {{aiTrace.deepseek.judgment === 'confirmed' ? '确认违规' : aiTrace.deepseek.judgment === 'rejected' ? '未违规' : '不确定'}}
+          </view>
+          <view class="timeline-detail">
+            置信度: {{(aiTrace.deepseek.confidence * 100).toFixed(1)}}%
+          </view>
+          <view class="timeline-detail" wx:if="{{aiTrace.deepseek.review_summary}}">
+            审核: {{aiTrace.deepseek.review_summary}}
+          </view>
+          <view class="timeline-detail" wx:if="{{aiTrace.deepseek.disagreement_flag}}">
+            <text class="disagreement-flag">⚠️ 本地与云端判断不一致</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 最终裁决 -->
+      <view class="timeline-item">
+        <view class="timeline-dot final"></view>
+        <view class="timeline-content">
+          <view class="timeline-title">最终裁决</view>
+          <view class="timeline-detail">
+            结果: {{aiTrace.final.judgment === 'confirmed' ? '确认违规' : aiTrace.final.judgment === 'rejected' ? '未违规' : '待人工复核'}}
+          </view>
+          <view class="timeline-detail">
+            最终置信度: {{(aiTrace.final.confidence * 100).toFixed(1)}}%
+          </view>
+          <view class="timeline-detail" wx:if="{{aiTrace.final.method}}">
+            方法: {{aiTrace.final.method}}
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 操作按钮 -->
+  <view class="actions">
+    <button 
+      class="btn-appeal" 
+      bindtap="goToAppeal"
+      wx:if="{{violation.status === 'confirmed'}}"
+    >提交申诉</button>
+    <button class="btn-appeal-list" bindtap="goToAppealList">查看申诉</button>
+  </view>
+</view>
+
+<view class="loading" wx:if="{{loading}}">
+  <text>加载中...</text>
+</view>

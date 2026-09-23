@@ -1,0 +1,100 @@
+{
+  "task": "TASK-014",
+  "timestamp": "2026-07-21T20:55:00",
+  "status": "PARTIAL",
+  "details": {
+    "gpu_environment": {
+      "cuda_available": true,
+      "gpu_model": "NVIDIA GeForce RTX 4060 Laptop GPU",
+      "pytorch_version": "2.5.1",
+      "environment_path": "C:\\miniconda\\envs\\zhitong-gpu"
+    },
+    "model_training": {
+      "vehicle_model": {
+        "model": "YOLOv8s",
+        "epochs": 50,
+        "early_stopping_epoch": 43,
+        "best_epoch": 13,
+        "metrics": {
+          "mAP50": 0.38,
+          "mAP50-95": 0.378,
+          "precision": 0.248,
+          "recall": 1.0
+        },
+        "classes": {
+          "car": {"mAP50": 0.221},
+          "motorcycle": {"mAP50": 0.376},
+          "truck": {"mAP50": 0.599},
+          "bus": {"mAP50": 0.324}
+        },
+        "speed_ms": {
+          "preprocess": 0.5,
+          "inference": 3.3,
+          "postprocess": 2.2
+        },
+        "target_mAP50": 0.85,
+        "achieved": false
+      },
+      "helmet_model": {
+        "model": "YOLOv8s",
+        "epochs": 100,
+        "early_stopping_epoch": 82,
+        "best_epoch": 32,
+        "metrics": {
+          "mAP50": 0.672,
+          "mAP50-95": 0.656,
+          "precision": 0.494,
+          "recall": 1.0
+        },
+        "classes": {
+          "helmet": {"mAP50": 0.716},
+          "no_helmet": {"mAP50": 0.628}
+        },
+        "speed_ms": {
+          "preprocess": 0.2,
+          "inference": 3.1,
+          "postprocess": 0.5
+        },
+        "target_mAP50": 0.80,
+        "achieved": false
+      }
+    },
+    "model_files": {
+      "vehicle_best": "E:\\output\\1\\zhitong\\training\\models\\vehicle_best.pt",
+      "helmet_best": "E:\\output\\1\\zhitong\\training\\models\\helmet_best.pt",
+      "traffic_light_best": "E:\\output\\1\\zhitong\\training\\models\\traffic_light_best.pt"
+    },
+    "system_integration": {
+      "image_recognizer_updated": true,
+      "model_config_updated": true,
+      "vehicle_model_added": true,
+      "multi_model_sequence_updated": true
+    },
+    "deviations": [
+      {
+        "item": "conda环境路径",
+        "expected": "conda activate zhitong-gpu",
+        "actual": "C:\\miniconda\\envs\\zhitong-gpu\\python.exe",
+        "reason": "系统中无法直接使用conda命令，需使用绝对路径调用Python"
+      },
+      {
+        "item": "车辆模型mAP50",
+        "expected": "> 0.85",
+        "actual": "0.38",
+        "reason": "数据集规模较小（训练集460张，验证集57张），且训练在第13epoch后停止提升"
+      },
+      {
+        "item": "头盔模型mAP50",
+        "expected": "> 0.80",
+        "actual": "0.672",
+        "reason": "数据集规模较小（验证集仅20张），训练在第32epoch后停止提升"
+      },
+      {
+        "item": "训练脚本参数",
+        "expected": "支持--model和--data参数",
+        "actual": "使用--config配置文件",
+        "reason": "train.py脚本设计为通过YAML配置文件管理参数，而非直接命令行参数"
+      }
+    ]
+  }
+}

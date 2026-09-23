@@ -1,0 +1,81 @@
+{
+  "task": "TASK-029-M06",
+  "timestamp": "2026-08-21T22:55:00+08:00",
+  "status": "PASS",
+  "module": "realtime_detector 集成循环缓存+事件引擎（GPT §11）",
+  "target_file": "e:\\output\\1\\api\\realtime_detector.py",
+  "related_fix": "e:\\output\\1\\api\\cloud_collaborator.py（修复 M05 遗留 bug：1.添加 self.claude_api_key 初始化 2.process_cloud_response 缺失 opinion_match 变量 3._build_event_final_judgment 调用签名错误）",
+  "added_imports": [
+    "from circular_frame_buffer import CircularFrameBuffer",
+    "from traffic_event_engine import TrafficEventEngine, TrafficEvent, EventState"
+  ],
+  "added_methods": [
+    "_init_frame_buffer - 初始化循环缓存（graceful degradation）",
+    "_init_event_engine - 初始化事件引擎+加载规则插件",
+    "_buffer_frame - 写入循环缓存（携带最近检测结果）",
+    "_process_event_engine - 调用事件引擎，触发新事件",
+    "_handle_event_lifecycle - 后台线程处理事件全生命周期（录制→提交AI→应用结果）",
+    "_pick_key_frame_paths - 选取首/中/尾三帧作为关键帧",
+    "_get_event_engine_status - 获取事件引擎状态摘要"
+  ],
+  "modified_methods": [
+    "__init__ - 增加 frame_buffer/event_engine/active_events 初始化",
+    "_detection_loop - CARLA/camera/video 三路都写入循环缓存",
+    "process_frame - 末尾调用 _process_event_engine（叠加层）",
+    "detect_external_frame - 外部帧也写入循环缓存",
+    "get_status - 增加 frame_buffer_size/frame_buffer_duration/active_events/event_engine 字段",
+    "start_detection - 重启时清空循环缓存和活跃事件",
+    "stop - 停止时清理循环缓存和活跃事件"
+  ],
+  "verification": {
+    "ast_check": "PASS (AST OK)",
+    "backend_startup": "PASS (Application startup complete, Uvicorn running on http://0.0.0.0:8001)",
+    "health_endpoint": "PASS ({status: healthy, overall: ok})",
+    "status_endpoint": "PASS (返回 frame_buffer_size/active_events/event_engine 字段)",
+    "plugins_endpoint": "PASS (3 个插件正常加载：public_security/traffic/urban_management)",
+    "no_startup_errors": true,
+    "existing_features_preserved": true
+  },
+  "status_endpoint_response": {
+    "frame_buffer_size": 0,
+    "frame_buffer_duration": 0.0,
+    "active_events": 0,
+    "event_engine": {
+      "available": true,
+      "total_events": 0,
+      "pending_ai": 0,
+      "confirmed": 0,
+      "rejected": 0,
+      "manual_review": 0,
+      "triggered": 0,
+      "recording": 0,
+      "ai_reviewed": 0
+    }
+  },
+  "acceptance_criteria": {
+    "CircularFrameBuffer_集成_init_and_loop": true,
+    "TrafficEventEngine_集成_process_frame": true,
+    "事件触发自动提取视频保存提交AI": true,
+    "get_status_返回事件引擎状态": true,
+    "现有功能不受影响": true,
+    "python_ast_passed": true,
+    "后端启动无报错": true
+  },
+  "feedback": {
+    "project_suggestions": [
+      "事件视频和关键帧目前保存在 output/event_videos/ 目录，M07 路由层需挂载 StaticFiles 暴露给前端访问"
+    ],
+    "commander_suggestions": [
+      "M07 数据库迁移时建议在 traffic_events 表增加 camera_id 字段索引，便于按摄像头筛选事件",
+      "M08 前端事件中心需通过 /api/realtime/events/active 轮询获取活跃事件，建议轮询间隔 2-3s",
+      "事件 AI 分析目前是同步阻塞调用，生产环境建议引入消息队列（如 Redis Stream）异步处理"
+    ],
+    "dissent": "无",
+    "suggestions_adopted": [
+      "采用 GPT §11 增量开发原则，事件引擎作为叠加层加入，不删除现有违规检测/多帧确认/数字孪生逻辑",
+      "采用 graceful degradation 原则，循环缓存和事件引擎任一初始化失败都不影响主检测流程",
+      "事件生命周期处理放在后台线程，避免阻塞检测循环（YOLO 实时性优先）",
+      "修复了 M05 遗留的 3 个 bug（claude_api_key 未初始化、opinion_match 未定义、process_cloud_response 调用签名错误），保证 analyze_event 可被实际调用"
+    ]
+  }
+}

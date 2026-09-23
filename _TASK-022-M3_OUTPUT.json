@@ -1,0 +1,20 @@
+{
+  "task": "TASK-022-M3",
+  "timestamp": "2026-07-24T01:27:00+08:00",
+  "status": "PASS",
+  "details": {
+    "approach": "前端 getUserMedia + 后端检测返回带框帧",
+    "video_source": "前端摄像头 (getUserMedia)",
+    "detection_method": "每 500ms 截图发送后端 /detect-frame",
+    "result_display": "后端返回 annotated_frame (已叠加 YOLO 识别框)",
+    "fps_display": true,
+    "violation_badge": true,
+    "violation_history": true,
+    "detection_list": true
+  },
+  "deviations": [
+    "放弃了 MJPEG 流方案，改用 base64 帧轮询方案",
+    "前端 video 元素仅作为采集源，实际显示后端返回的带框帧"
+  ],
+  "screenshot_path": ""
+}

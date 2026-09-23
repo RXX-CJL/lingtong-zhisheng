@@ -1,0 +1,67 @@
+<!--pages/index/index.wxml-->
+<view class="container">
+  <!-- 顶部标题区 -->
+  <view class="header">
+    <text class="title">智瞳灵声</text>
+    <text class="subtitle">智慧交管违规举报平台</text>
+  </view>
+
+  <!-- 功能入口 -->
+  <view class="entry-section">
+    <view class="entry-row">
+      <view class="entry-item" bindtap="goToSubmit">
+        <view class="entry-icon bg-blue">
+          <text class="icon-text">拍</text>
+        </view>
+        <text class="entry-label">拍照举报</text>
+      </view>
+      <view class="entry-item" bindtap="goToList">
+        <view class="entry-icon bg-green">
+          <text class="icon-text">录</text>
+        </view>
+        <text class="entry-label">我的记录</text>
+      </view>
+      <view class="entry-item" bindtap="goToStatistics">
+        <view class="entry-icon bg-orange">
+          <text class="icon-text">统</text>
+        </view>
+        <text class="entry-label">全局统计</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 我的统计卡片 -->
+  <view class="card stats-card">
+    <view class="stats-title">我的举报统计</view>
+    <view class="stats-content" wx:if="{{stats}}">
+      <view class="stats-item">
+        <text class="stats-num">{{stats.total || 0}}</text>
+        <text class="stats-label">总举报数</text>
+      </view>
+      <view class="stats-divider"></view>
+      <view class="stats-item">
+        <text class="stats-num confirmed">{{stats.confirmed || 0}}</text>
+        <text class="stats-label">已确认</text>
+      </view>
+      <view class="stats-divider"></view>
+      <view class="stats-item">
+        <text class="stats-num pending">{{stats.pending || 0}}</text>
+        <text class="stats-label">待审核</text>
+      </view>
+    </view>
+    <view class="stats-content" wx:else>
+      <text class="stats-empty">暂无数据</text>
+    </view>
+    <view class="stats-tip">你已举报 {{stats.total || 0}} 条，其中 {{stats.confirmed || 0}} 条已确认</view>
+  </view>
+
+  <!-- 快捷操作提示 -->
+  <view class="card tips-card">
+    <view class="tips-title">使用说明</view>
+    <view class="tips-list">
+      <text class="tips-item">1. 点击「拍照举报」上传违规证据</text>
+      <text class="tips-item">2. 选择违规类型并填写说明</text>
+      <text class="tips-item">3. 提交后可在「我的记录」查看审核状态</text>
+    </view>
+  </view>
+</view>

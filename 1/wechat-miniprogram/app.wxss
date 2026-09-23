@@ -1,0 +1,165 @@
+/* 全局样式 */
+page {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: #f5f7fa;
+  font-size: 28rpx;
+  color: #333;
+  line-height: 1.6;
+}
+
+.container {
+  padding: 24rpx;
+}
+
+/* 卡片样式 */
+.card {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.05);
+}
+
+/* 主要按钮 */
+.btn-primary {
+  background: #1890ff;
+  color: #fff;
+  border-radius: 48rpx;
+  text-align: center;
+  padding: 24rpx 0;
+  font-size: 32rpx;
+  border: none;
+}
+
+.btn-primary:active {
+  opacity: 0.8;
+}
+
+.btn-primary[disabled] {
+  background: #ccc;
+  color: #fff;
+}
+
+/* 次要按钮 */
+.btn-secondary {
+  background: #f5f7fa;
+  color: #666;
+  border-radius: 48rpx;
+  text-align: center;
+  padding: 24rpx 0;
+  font-size: 32rpx;
+  border: 1rpx solid #ddd;
+}
+
+/* 徽章样式 */
+.badge-pending {
+  background: #faad14;
+  color: #fff;
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+  font-size: 22rpx;
+  display: inline-block;
+}
+
+.badge-confirmed {
+  background: #52c41a;
+  color: #fff;
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+  font-size: 22rpx;
+  display: inline-block;
+}
+
+.badge-rejected {
+  background: #8c8c8c;
+  color: #fff;
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+  font-size: 22rpx;
+  display: inline-block;
+}
+
+/* 违规类型徽章 */
+.badge-red_light {
+  background: #ff4d4f;
+  color: #fff;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  font-size: 22rpx;
+}
+
+.badge-no_helmet {
+  background: #fa8c16;
+  color: #fff;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  font-size: 22rpx;
+}
+
+.badge-wrong_way {
+  background: #722ed1;
+  color: #fff;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  font-size: 22rpx;
+}
+
+.badge-illegal_parking {
+  background: #eb2f96;
+  color: #fff;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  font-size: 22rpx;
+}
+
+.badge-lane_departure {
+  background: #13c2c2;
+  color: #fff;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  font-size: 22rpx;
+}
+
+.badge-speeding {
+  background: #f5222d;
+  color: #fff;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  font-size: 22rpx;
+}
+
+/* 输入框样式 */
+.input {
+  background: #f5f7fa;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  font-size: 28rpx;
+}
+
+.textarea {
+  background: #f5f7fa;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  font-size: 28rpx;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 加载提示 */
+.loading {
+  text-align: center;
+  padding: 40rpx;
+  color: #999;
+}
+
+/* 空状态 */
+.empty {
+  text-align: center;
+  padding: 100rpx 40rpx;
+  color: #999;
+}
+
+.empty-icon {
+  font-size: 120rpx;
+  margin-bottom: 20rpx;
+}

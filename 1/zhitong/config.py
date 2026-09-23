@@ -109,6 +109,13 @@ class Config:
         'speeding': '超速'
     }
     
+    # API配置
+    API_BASE_URL = "http://127.0.0.1:8000"
+    API_SUBMIT_ENDPOINT = "/api/violations/submit"
+    API_TIMEOUT = 10
+    API_RETRY_TIMES = 2
+    ENABLE_API_UPLOAD = True
+    
     @classmethod
     def create_dirs(cls):
         for dir_path in [cls.MODEL_DIR, cls.OUTPUT_DIR, cls.EVIDENCE_DIR, cls.LOG_DIR, 

@@ -1,0 +1,68 @@
+<view class="container">
+  <!-- 统计卡片 -->
+  <view class="stats-bar">
+    <view class="stat-item" bindtap="onTabChange" data-index="1">
+      <text class="stat-num">{{stats.pending || 0}}</text>
+      <text class="stat-label">待处理</text>
+    </view>
+    <view class="stat-item" bindtap="onTabChange" data-index="2">
+      <text class="stat-num">{{stats.reviewing || 0}}</text>
+      <text class="stat-label">审核中</text>
+    </view>
+    <view class="stat-item" bindtap="onTabChange" data-index="3">
+      <text class="stat-num">{{stats.approved || 0}}</text>
+      <text class="stat-label">已通过</text>
+    </view>
+    <view class="stat-item" bindtap="onTabChange" data-index="4">
+      <text class="stat-num">{{stats.rejected || 0}}</text>
+      <text class="stat-label">已驳回</text>
+    </view>
+  </view>
+
+  <!-- 标签切换 -->
+  <view class="tabs">
+    <scroll-view scroll-x class="tab-scroll">
+      <view class="tab-list">
+        <view 
+          class="tab-item {{tabIndex === index ? 'active' : ''}}"
+          wx:for="{{tabs}}"
+          wx:key="index"
+          bindtap="onTabChange"
+          data-index="{{index}}"
+        >{{item}}</view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 申诉列表 -->
+  <view class="appeal-list">
+    <view 
+      class="appeal-item"
+      wx:for="{{appeals}}"
+      wx:key="violation_id"
+      bindtap="viewDetail"
+      data-violation-id="{{item.violation_id}}"
+    >
+      <view class="appeal-header">
+        <text class="appeal-id">违规 #{{item.violation_id}}</text>
+        <view class="status-badge status-{{item.status}}">
+          {{statusMap[item.status]}}
+        </view>
+      </view>
+      <view class="appeal-body">
+        <text class="appeal-reason">{{item.reason}}</text>
+      </view>
+      <view class="appeal-footer">
+        <text class="appeal-time">{{item.created_at}}</text>
+        <text class="appeal-arrow">></text>
+      </view>
+    </view>
+
+    <view class="empty-tip" wx:if="{{!loading && appeals.length === 0}}">
+      暂无申诉记录
+    </view>
+    <view class="loading-tip" wx:if="{{loading}}">
+      加载中...
+    </view>
+  </view>
+</view>

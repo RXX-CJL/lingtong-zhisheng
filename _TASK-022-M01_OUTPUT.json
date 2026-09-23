@@ -1,0 +1,68 @@
+{
+  "task": "TASK-022-M01",
+  "timestamp": "2026-07-24T15:00:00",
+  "status": "PASS",
+  "details": {
+    "step1_read_report": {
+      "status": "PASS",
+      "description": "读取现有能力报告单"
+    },
+    "step2_ls_mcp_servers": {
+      "status": "PASS",
+      "description": "列出所有 MCP 服务器目录",
+      "servers": [
+        "integrated_browser",
+        "mcp_GitHub",
+        "mcp_Multi_Fetch",
+        "mcp_Postgrest",
+        "mcp_Sequential_Thinking",
+        "mcp_bigquery",
+        "mcp_fetch",
+        "mcp_mcp-clickhouse",
+        "mcp_supabase-community",
+        "mcp_windows-cli"
+      ]
+    },
+    "step3_read_tool_descriptors": {
+      "status": "PASS",
+      "description": "读取各 MCP 服务器的工具 JSON 描述文件",
+      "tools_read": {
+        "integrated_browser": 17,
+        "mcp_GitHub": 24,
+        "mcp_Multi_Fetch": 5,
+        "mcp_Postgrest": 2,
+        "mcp_Sequential_Thinking": 1,
+        "mcp_bigquery": 1,
+        "mcp_fetch": 1,
+        "mcp_mcp-clickhouse": 3,
+        "mcp_supabase-community": 2,
+        "mcp_windows-cli": 9
+      }
+    },
+    "step4_update_mcp_section": {
+      "status": "PASS",
+      "description": "补全 MCP 工具明细",
+      "sections_added": [
+        "2.1 浏览器自动化（integrated_browser）- 17个工具",
+        "2.2 GitHub（mcp_GitHub）- 24个工具",
+        "2.3 数据库（4个 MCP）- 6个工具",
+        "2.4 网络请求（2个 MCP）- 6个工具",
+        "2.5 命令执行（mcp_windows-cli）- 9个工具",
+        "2.11 顺序思考（mcp_Sequential_Thinking）- 1个工具"
+      ]
+    },
+    "step5_add_git_section": {
+      "status": "PASS",
+      "description": "添加 Git 复用能力章节",
+      "subsections": [
+        "9.1 复用策略",
+        "9.2 常用搜索模式",
+        "9.3 复用评估标准",
+        "9.4 复用时的注意事项"
+      ]
+    }
+  },
+  "deviations": [],
+  "screenshot_path": "",
+  "report_path": "e:\\output\\executor_capability_report.md"
+}

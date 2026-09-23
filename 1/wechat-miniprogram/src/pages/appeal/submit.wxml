@@ -1,0 +1,112 @@
+<!-- 申诉提交页面 -->
+<view class="appeal-submit">
+  <!-- 加载状态 -->
+  <view wx:if="{{loading}}" class="loading-view">
+    <text>加载中...</text>
+  </view>
+
+  <!-- 违规信息卡片 -->
+  <view wx:if="{{violation && !loading}}" class="violation-card">
+    <view class="card-header">
+      <text class="card-title">违规信息</text>
+      <text class="violation-type {{violation.violation_type}}">{{violation.violation_type}}</text>
+    </view>
+    <view class="card-content">
+      <view class="info-row">
+        <text class="label">违规时间</text>
+        <text class="value">{{violation.timestamp}}</text>
+      </view>
+      <view class="info-row">
+        <text class="label">车牌号</text>
+        <text class="value">{{violation.plate_number || '未知'}}</text>
+      </view>
+      <view class="info-row">
+        <text class="label">处理状态</text>
+        <text class="value status-{{violation.status}}">{{violation.status}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 申诉表单 -->
+  <view wx:if="{{!loading}}" class="form-card">
+    <view class="card-header">
+      <text class="card-title">申诉理由</text>
+    </view>
+
+    <!-- 申诉原因 -->
+    <view class="form-item">
+      <text class="form-label">申诉说明</text>
+      <textarea
+        class="form-textarea"
+        placeholder="请详细描述申诉理由（至少10个字）..."
+        value="{{reason}}"
+        bindinput="onReasonInput"
+        maxlength="500"
+      />
+      <text class="char-count">{{reason.length}}/500</text>
+    </view>
+
+    <!-- 联系方式 -->
+    <view class="form-item">
+      <text class="form-label">联系方式</text>
+      <input
+        class="form-input"
+        type="text"
+        placeholder="请输入手机号或其他联系方式"
+        value="{{contact}}"
+        bindinput="onContactInput"
+      />
+    </view>
+
+    <!-- 证据图片 -->
+    <view class="form-item">
+      <text class="form-label">证据图片（可选）</text>
+      <view class="image-list">
+        <view
+          wx:for="{{images}}"
+          wx:key="index"
+          class="image-item"
+        >
+          <image
+            src="{{item}}"
+            mode="aspectFill"
+            bindtap="previewImage"
+            data-src="{{item}}"
+          />
+          <view
+            class="remove-btn"
+            bindtap="removeImage"
+            data-index="{{index}}"
+          >×</view>
+        </view>
+        <view
+          wx:if="{{images.length < maxImages}}"
+          class="add-image-btn"
+          bindtap="chooseImage"
+        >
+          <text class="icon">+</text>
+          <text class="text">添加图片</text>
+        </view>
+      </view>
+      <text class="image-hint">最多上传{{maxImages}}张图片</text>
+    </view>
+
+    <!-- 提交按钮 -->
+    <button
+      class="submit-btn {{submitting ? 'disabled' : ''}}"
+      bindtap="submitAppeal"
+      disabled="{{submitting}}"
+    >
+      {{submitting ? '提交中...' : '提交申诉'}}
+    </button>
+  </view>
+
+  <!-- 提示信息 -->
+  <view class="tips">
+    <text class="tips-title">申诉须知</text>
+    <text class="tips-item">1. 请如实填写申诉理由</text>
+    <text class="tips-item">2. 上传的证据图片需与申诉内容相关</text>
+    <text class="tips-item">3. 工作人员将在1-3个工作日内处理您的申诉</text>
+    <text class="tips-item">4. 如有疑问，请联系客服</text>
+  </view>
+</view>

@@ -1,0 +1,246 @@
+@import '../../styles/variables.scss';
+
+.mine-page {
+  min-height: 100vh;
+  background-color: $color-bg-page;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 120rpx);
+}
+
+.profile-section {
+  position: relative;
+  padding: $spacing-xl;
+  padding-top: calc(var(--status-bar-height) + 40rpx);
+}
+
+.profile-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 320rpx;
+  background: linear-gradient(135deg, $color-primary 0%, $color-primary-light 100%);
+  border-radius: 0 0 48rpx 48rpx;
+}
+
+.profile-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.avatar {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: $spacing-md;
+  border: 4rpx solid rgba(255, 255, 255, 0.5);
+}
+
+.avatar-text {
+  font-size: 56rpx;
+}
+
+.user-name {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-semibold;
+  color: $color-text-white;
+  margin-bottom: $spacing-xs;
+}
+
+.user-id {
+  font-size: $font-size-sm;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.stats-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  margin: -$spacing-lg $page-padding $spacing-md;
+  padding: $spacing-lg;
+  background-color: $color-bg-card;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-card;
+  position: relative;
+  z-index: 2;
+}
+
+.stat-item {
+  flex: 1;
+  text-align: center;
+}
+
+.stat-value {
+  display: block;
+  font-size: 40rpx;
+  font-weight: $font-weight-bold;
+  color: $color-primary;
+}
+
+.stat-label {
+  display: block;
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  margin-top: $spacing-xs;
+}
+
+.stat-divider {
+  width: 1rpx;
+  height: 60rpx;
+  background-color: $color-border;
+}
+
+.menu-card {
+  margin: $spacing-md $page-padding;
+  background-color: $color-bg-card;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-card;
+  overflow: hidden;
+}
+
+.menu-title {
+  padding: $spacing-lg;
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  border-bottom: 1rpx solid $color-divider;
+}
+
+.report-list {
+  padding: $spacing-md;
+}
+
+.report-item {
+  display: flex;
+  align-items: center;
+  padding: $spacing-md 0;
+  border-bottom: 1rpx solid $color-divider;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.report-image {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: $radius-sm;
+  margin-right: $spacing-md;
+}
+
+.report-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.report-type {
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  margin-bottom: $spacing-xs;
+}
+
+.report-time {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+}
+
+.report-status {
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $radius-xs;
+  font-size: $font-size-xs;
+
+  &.pending {
+    background-color: rgba($color-warning, 0.1);
+    color: $color-warning;
+  }
+
+  &.approved {
+    background-color: rgba($color-success, 0.1);
+    color: $color-success;
+  }
+
+  &.rejected {
+    background-color: rgba($color-error, 0.1);
+    color: $color-error;
+  }
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: $spacing-lg;
+  border-bottom: 1rpx solid $color-divider;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:active {
+    background-color: $color-bg-hover;
+  }
+}
+
+.menu-icon {
+  font-size: $font-size-xl;
+  margin-right: $spacing-md;
+}
+
+.menu-text {
+  flex: 1;
+  font-size: $font-size-md;
+  color: $color-text-primary;
+}
+
+.menu-arrow {
+  font-size: $font-size-xl;
+  color: $color-text-tertiary;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: $spacing-xl;
+}
+
+.empty-icon {
+  font-size: 80rpx;
+  margin-bottom: $spacing-md;
+}
+
+.empty-text {
+  font-size: $font-size-md;
+  color: $color-text-tertiary;
+}
+
+.loading {
+  text-align: center;
+  padding: $spacing-xl;
+  color: $color-text-tertiary;
+}
+
+.refresh-btn {
+  @include button-reset;
+  width: calc(100% - 2 * $page-padding);
+  margin: $spacing-md $page-padding;
+  height: $button-height-md;
+  background-color: $color-bg-card;
+  border-radius: $radius-button;
+  border: 1rpx solid $color-border;
+
+  &:active {
+    background-color: $color-bg-hover;
+  }
+}
+
+.refresh-text {
+  font-size: $font-size-md;
+  color: $color-text-secondary;
+}

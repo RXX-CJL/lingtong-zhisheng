@@ -1,0 +1,26 @@
+{
+  "task": "TASK-024-M2",
+  "timestamp": "2026-07-24T11:45:00+08:00",
+  "status": "PASS",
+  "details": {
+    "guide_path": "e:\\output\\1\\miniprogram\\USER_GUIDE.md",
+    "sections": [
+      "注册微信小程序",
+      "获取 AppID 和 AppSecret",
+      "配置合法域名",
+      "上传代码到微信开发者工具",
+      "提交审核与发布",
+      "常见问题"
+    ],
+    "content": {
+      "注册流程": "完整的微信公众平台注册步骤",
+      "AppID配置": "详细说明如何获取和配置AppID/AppSecret",
+      "域名配置": "包括request合法域名、socket合法域名配置",
+      "上传步骤": "从安装开发者工具到上传代码的完整流程",
+      "审核发布": "提交审核、等待审核、发布上线的步骤",
+      "FAQ": "6个常见问题及解决方案"
+    }
+  },
+  "deviations": [],
+  "screenshot_path": []
+}

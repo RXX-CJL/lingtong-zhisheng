@@ -1,0 +1,62 @@
+<!--pages/submit/submit.wxml-->
+<view class="container">
+  <!-- 图片预览区 -->
+  <view class="card">
+    <view class="section-title">违规证据图片</view>
+    <view class="image-grid">
+      <block wx:for="{{images}}" wx:key="index">
+        <view class="image-item">
+          <image src="{{item}}" mode="aspectFill" bindtap="previewImage" data-index="{{index}}" />
+          <view class="image-remove" bindtap="removeImage" data-index="{{index}}">×</view>
+        </view>
+      </block>
+      <view class="image-add" bindtap="chooseImage" wx:if="{{images.length < 3}}">
+        <text class="add-icon">+</text>
+        <text class="add-text">添加图片</text>
+      </view>
+    </view>
+    <view class="image-tip">最多上传3张图片</view>
+  </view>
+
+  <!-- 违规类型选择 -->
+  <view class="card">
+    <view class="section-title">违规类型</view>
+    <scroll-view class="type-scroll" scroll-x="true">
+      <view class="type-list">
+        <block wx:for="{{typeList}}" wx:key="value">
+          <view
+            class="type-item {{selectedType === item.value ? 'active' : ''}}"
+            bindtap="selectType"
+            data-type="{{item.value}}"
+          >
+            <text class="type-name">{{item.label}}</text>
+          </view>
+        </block>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 补充说明 -->
+  <view class="card">
+    <view class="section-title">补充说明</view>
+    <textarea
+      class="textarea"
+      placeholder="请输入违规详情描述（可选）"
+      maxlength="200"
+      bindinput="onRemarkInput"
+      value="{{remark}}"
+    />
+    <view class="word-count">{{remark.length}}/200</view>
+  </view>
+
+  <!-- 提交按钮 -->
+  <view class="submit-section">
+    <button
+      class="btn-primary {{submitting ? 'disabled' : ''}}"
+      bindtap="submit"
+      disabled="{{submitting}}"
+    >
+      {{submitting ? '提交中...' : '提交举报'}}
+    </button>
+  </view>
+</view>

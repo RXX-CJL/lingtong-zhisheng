@@ -1,0 +1,63 @@
+<view class="container">
+  <!-- 筛选区域 -->
+  <view class="filter-section">
+    <picker mode="selector" range="{{statusOptions}}" range-key="label" bindchange="onStatusChange">
+      <view class="filter-item">
+        <text>{{statusLabel}}</text>
+        <text class="arrow">▼</text>
+      </view>
+    </picker>
+  </view>
+
+  <!-- 违规列表 -->
+  <view class="violation-list">
+    <view 
+      class="violation-card" 
+      wx:for="{{violations}}" 
+      wx:key="id"
+      bindtap="viewDetail"
+      data-id="{{item.id}}"
+    >
+      <view class="card-header">
+        <text class="violation-type">{{item.violation_type}}</text>
+        <view class="status-badge status-{{item.status}}">
+          {{statusMap[item.status]}}
+        </view>
+      </view>
+      
+      <view class="card-body">
+        <view class="info-row">
+          <text class="label">时间：</text>
+          <text class="value">{{item.timestamp}}</text>
+        </view>
+        <view class="info-row">
+          <text class="label">置信度：</text>
+          <text class="value confidence">{{(item.confidence * 100).toFixed(1)}}%</text>
+        </view>
+      </view>
+      
+      <view class="card-footer" wx:if="{{item.image_path}}">
+        <image 
+          class="evidence-img" 
+          src="{{item.image_path}}" 
+          mode="aspectFill"
+          catchtap="previewImage"
+          data-src="{{item.image_path}}"
+        />
+      </view>
+    </view>
+
+    <!-- 空状态 -->
+    <view class="empty-state" wx:if="{{!loading && violations.length === 0}}">
+      <text>暂无违规记录</text>
+    </view>
+
+    <!-- 加载更多 -->
+    <view class="load-more" wx:if="{{loading}}">
+      <text>加载中...</text>
+    </view>
+    <view class="no-more" wx:if="{{!hasMore && violations.length > 0}}">
+      <text>没有更多了</text>
+    </view>
+  </view>
+</view>

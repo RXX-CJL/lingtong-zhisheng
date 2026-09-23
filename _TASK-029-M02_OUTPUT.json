@@ -1,0 +1,62 @@
+{
+  "task": "TASK-029-M02",
+  "timestamp": "2026-08-21T16:30:00+08:00",
+  "status": "PASS",
+  "vpn_status": "NOT_NEEDED",
+  "skills_used": [
+    {"skill": "test-driven-development", "used": true, "detail": "先写 9 个测试用例再实现，全部通过；测试覆盖添加/溢出/提取/保存/duration/get_latest/clear/异常参数/路径生成"},
+    {"skill": "verification-before-completion", "used": true, "detail": "3 文件 AST 验证通过 + 9/9 单元测试通过 + mp4 文件生成验证"}
+  ],
+  "git_references": [],
+  "deviations": [
+    "通知文件要求测试 ≥6 个，实际实现 9 个测试用例（超出要求），额外覆盖了 invalid_params 和 generate_event_video_path 两个边界场景",
+    "通知文件要求事件视频目录为 e:\\output\\1\\api\\output\\event_videos\\{YYYYMMDD}\\{event_id}.mp4，实际通过 Config.EVENT_VIDEO_DIR 配置化，默认值与通知一致"
+  ],
+  "feedback": {
+    "project_suggestions": [
+      "M06 集成时建议在 _detection_loop 中调用 frame_buffer.add() 后不阻塞，避免影响检测帧率；extract_event_clip 只在事件触发时调用，频率低不影响",
+      "建议 M03 事件引擎的 cooldown 机制复用 M02 的 duration 属性做时间窗口判断，避免引入额外的时间计算",
+      "M04 EvidenceChain 的 event_video_path 字段建议直接用 M02 的 generate_event_video_path 方法生成，保证路径一致性"
+    ],
+    "commander_suggestions": [
+      "M02 测试 9/9 通过超出要求的 6 个，建议后续任务通知继续保持'最低要求+鼓励超额'的验收标准表述",
+      "Config.EVENT_VIDEO_DIR 配置化是合理设计，但建议在 M07 数据库迁移时同步记录到 system_configs 表，便于运维查询"
+    ],
+    "difficulties": [
+      "无重大困难；cv2.VideoWriter 在 Windows 上 mp4v 编码正常工作，无需额外配置"
+    ],
+    "dissent": [],
+    "suggestions_adopted": [
+      {"from": "M01 风险评估", "content": "缓存帧内存压力", "adopted": true, "action": "deque 存储帧引用，extract_event_clip 返回引用不拷贝，save_event_video 按需读取，避免 1.8GB 内存压力"}
+    ]
+  },
+  "details": {
+    "summary": "M02 完成 CircularFrameBuffer 视频循环缓存模块。实现 7 个方法（add/extract_event_clip/save_event_video/get_latest/clear/size/duration）+ generate_event_video_path 辅助方法 + get_default_buffer 单例工厂。用 collections.deque(maxlen=duration_sec*fps) 自动淘汰旧帧，threading.Lock 保证线程安全。config.py 增加 5 个配置参数（FRAME_BUFFER_DURATION/FRAME_BUFFER_FPS/EVENT_CLIP_BEFORE_SEC/EVENT_CLIP_AFTER_SEC/EVENT_VIDEO_DIR）。9 个单元测试全部通过，覆盖正常流程+边界+异常。",
+    "files_created": [
+      "e:/output/1/api/circular_frame_buffer.py (新建，180+ 行)",
+      "e:/output/1/tests/test_circular_frame_buffer.py (新建，9 个测试)"
+    ],
+    "files_modified": [
+      "e:/output/1/api/config.py (增加 5 个 M02 配置参数 + get_config 4 个返回字段)"
+    ],
+    "methods_implemented": [
+      "add(timestamp, frame, detection_result) — 添加帧",
+      "extract_event_clip(trigger_time, before_sec, after_sec) — 提取事件片段",
+      "save_event_video(frames, output_path, fps) — 保存 mp4",
+      "get_latest(n) — 获取最近 n 帧",
+      "clear() — 清空缓存",
+      "size (property) — 当前帧数",
+      "duration (property) — 当前缓存时长",
+      "generate_event_video_path(event_id) — 生成事件视频路径",
+      "get_default_buffer() — 模块级单例工厂"
+    ],
+    "verification": {
+      "ast_check": "PASS 3/3 (circular_frame_buffer.py + config.py + test_circular_frame_buffer.py)",
+      "unit_tests": "PASS 9/9 (test_add_and_size/test_extract_event_clip/test_save_event_video/test_duration/test_get_latest/test_clear/test_circular_overflow/test_invalid_params/test_generate_event_video_path)",
+      "mp4_generation": "PASS (3217 bytes 临时文件)",
+      "circular_overflow": "PASS (添加 20 帧保留最后 10 帧 i=[10..19])",
+      "time_range_extraction": "PASS (trigger=1005.0 range=[1002,1007] 返回 51 帧)",
+      "duration_calc": "PASS (10 帧间隔 0.1s duration=0.90s)"
+    }
+  }
+}

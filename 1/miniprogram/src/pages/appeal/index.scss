@@ -1,0 +1,203 @@
+.appeal-page {
+  min-height: 100vh;
+  background-color: #f5f7fa;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.page-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333333;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 100px 0;
+  color: #999999;
+  font-size: 14px;
+}
+
+.appeal-card {
+  margin: 15px;
+  padding: 15px;
+  background-color: #ffffff;
+  border-radius: 10px;
+}
+
+.card-section {
+  margin-bottom: 20px;
+
+  &:last-of-type {
+    margin-bottom: 0;
+  }
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333333;
+  margin-bottom: 12px;
+}
+
+.violation-info {
+  padding: 12px;
+  background-color: #f5f7fa;
+  border-radius: 8px;
+}
+
+.violation-type-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  background-color: #fff1f0;
+  color: #ff4d4f;
+  font-size: 12px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.violation-desc {
+  font-size: 14px;
+  color: #333333;
+  margin-bottom: 5px;
+}
+
+.violation-time,
+.violation-location {
+  font-size: 13px;
+  color: #666666;
+  margin-bottom: 5px;
+}
+
+.violation-image-wrap {
+  position: relative;
+  margin-top: 10px;
+}
+
+.violation-image {
+  width: 100%;
+  height: 200px;
+  border-radius: 8px;
+}
+
+.image-label {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  padding: 2px 8px;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: #ffffff;
+  font-size: 12px;
+  border-radius: 4px;
+}
+
+.reason-input,
+.contact-input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.input-count {
+  display: block;
+  text-align: right;
+  font-size: 12px;
+  color: #999999;
+  margin-top: 5px;
+}
+
+.image-upload {
+  width: 100%;
+  height: 150px;
+  border: 2px dashed #d9d9d9;
+  border-radius: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+
+  &.has-image {
+    border-style: solid;
+    border-color: #1890ff;
+  }
+}
+
+.uploaded-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.upload-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.upload-text {
+  font-size: 14px;
+  color: #999999;
+}
+
+.upload-hint {
+  display: block;
+  font-size: 12px;
+  color: #999999;
+  margin-top: 8px;
+}
+
+.submit-btn {
+  width: 100%;
+  height: 44px;
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  border: none;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+.submit-text {
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.tips-section {
+  padding: 15px;
+  margin: 0 15px 15px;
+  background-color: #fffbe6;
+  border-radius: 8px;
+  border: 1px solid #ffe58f;
+}
+
+.tips-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #d48806;
+  margin-bottom: 10px;
+}
+
+.tips-item {
+  display: block;
+  font-size: 13px;
+  color: #ad8b00;
+  margin-bottom: 5px;
+}

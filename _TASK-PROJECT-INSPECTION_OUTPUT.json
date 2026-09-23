@@ -1,0 +1,205 @@
+{
+  "project": {
+    "name": "智瞳灵声 - 基于视觉识别与云端推理的智慧交管系统",
+    "path": "e:\\output\\1\\",
+    "language": "zh-CN"
+  },
+  "task_type": "项目问题修复指令",
+  "excluded_categories": ["安全问题"],
+  "generated_at": "2026-06-19",
+  "output_language": "zh-CN",
+
+  "priority_order": [
+    "HIGH",
+    "MEDIUM", 
+    "LOW"
+  ],
+
+  "issues": {
+    "HIGH": [
+      {
+        "id": "ISSUE-002",
+        "title": "前端Vue组件图标导入缺失",
+        "severity": "HIGH",
+        "description": "ViolationDetail.vue中使用了Warning、Key、Cpu三个图标但未导入",
+        "file": "e:\\output\\1\\web-admin\\src\\views\\ViolationDetail.vue",
+        "lines": {
+          "145": "Warning组件未导入",
+          "190": "Key组件未导入", 
+          "202": "Cpu组件未导入"
+        },
+        "fix_command": "在import语句中添加缺失图标: Warning, Key, Cpu",
+        "code_snippet": "import { Search, Refresh, FullScreen, Close, Loading, Cpu, Warning, Key } from '@element-plus/icons-vue'",
+        "estimated_time": "5分钟"
+      },
+      {
+        "id": "ISSUE-003",
+        "title": "TensorRT配置未启用",
+        "severity": "HIGH",
+        "description": "config.py中USE_TENSORRT=False，YOLOv8n推理性能无法达到45ms/帧目标",
+        "file": "e:\\output\\1\\zhitong\\config.py",
+        "line": 10,
+        "current_value": "USE_TENSORRT = False",
+        "fix_steps": [
+          "1. 生成TensorRT engine文件",
+          "2. 添加engine文件加载逻辑到tensorrt_engine.py",
+          "3. 设置USE_TENSORRT = True当engine存在时"
+        ],
+        "estimated_time": "30分钟"
+      }
+    ],
+    
+    "MEDIUM": [
+      {
+        "id": "ISSUE-004",
+        "title": "微信小程序baseUrl硬编码",
+        "severity": "MEDIUM",
+        "description": "小程序API地址硬编码为http://127.0.0.1:8000，真机调试时无法访问本地后端",
+        "file": "e:\\output\\1\\wechat-miniprogram\\app.js",
+        "current_value": "baseUrl: 'http://127.0.0.1:8000'",
+        "fix_suggestions": [
+          "方案A: 实现自动获取局域网IP",
+          "方案B: 使用动态配置文件读取",
+          "方案C: 开发环境/生产环境分别配置"
+        ],
+        "estimated_time": "15分钟"
+      },
+      {
+        "id": "ISSUE-005",
+        "title": "数据库字段同步风险",
+        "severity": "MEDIUM",
+        "description": "ViolationEvidence模型新增yolo_detection_result字段，旧数据库可能缺少该列导致500错误",
+        "file": "e:\\output\\1\\api\\models.py",
+        "line": 31,
+        "affected_endpoint": "/api/violations/list",
+        "fix_suggestions": [
+          "方案A: 删除旧数据库让系统重建",
+          "方案B: 添加数据库迁移脚本"
+        ],
+        "estimated_time": "10分钟"
+      },
+      {
+        "id": "ISSUE-006",
+        "title": "图像识别模块缺少超时专用处理",
+        "severity": "MEDIUM",
+        "description": "image_recognizer.py调用云端API设置了timeout=30，但未对超时异常进行专门处理",
+        "file": "e:\\output\\1\\api\\image_recognizer.py",
+        "fix_command": "添加requests.exceptions.Timeout捕获逻辑",
+        "code_snippet": "try:\n    response = requests.post(url, json=payload, timeout=30)\nexcept requests.exceptions.Timeout:\n    logger.error('API请求超时')",
+        "estimated_time": "10分钟"
+      }
+    ],
+    
+    "LOW": [
+      {
+        "id": "ISSUE-007",
+        "title": "后端使用print()代替logging",
+        "severity": "LOW",
+        "description": "后端代码中大量使用print()而非标准logging模块",
+        "files_affected": ["e:\\output\\1\\api\\*.py", "e:\\output\\1\\zhitong\\*.py"],
+        "fix_command": "配置Python logging模块替换所有print()",
+        "code_snippet": "import logging\nlogger = logging.getLogger(__name__)\nlogger.info('message')",
+        "estimated_time": "20分钟"
+      },
+      {
+        "id": "ISSUE-008",
+        "title": "缺少单元测试",
+        "severity": "LOW",
+        "description": "项目缺少自动化测试覆盖",
+        "fix_command": "添加pytest测试用例",
+        "test_priority": [
+          "api路由测试",
+          "图像识别模块测试",
+          "违规检测逻辑测试"
+        ],
+        "estimated_time": "60分钟"
+      }
+    ]
+  },
+
+  "architecture_analysis": {
+    "strengths": [
+      "分层架构清晰: API/前端/微信小程序/核心算法模块分离",
+      "模块职责明确: detector, tracker, violation_detector, cloud_manager各司其职",
+      "配置集中管理: config.py统一管理配置项",
+      "支持多端接入: 同时提供Web API和微信小程序接口"
+    ],
+    "improvements_needed": [
+      "缺少数据库迁移管理工具",
+      "缺少统一的日志系统",
+      "缺少自动化测试覆盖",
+      "TensorRT加速未实际启用"
+    ]
+  },
+
+  "module_status": {
+    "YOLO检测": {"file": "zhitong/detector.py", "status": "COMPLETE"},
+    "DeepSORT跟踪": {"file": "zhitong/tracker.py", "status": "COMPLETE"},
+    "违规检测": {"file": "zhitong/violation_detector.py", "status": "COMPLETE"},
+    "语音播报": {"file": "zhitong/speech_manager.py", "status": "COMPLETE"},
+    "云端管理": {"file": "zhitong/cloud_manager.py", "status": "COMPLETE"},
+    "TensorRT": {"file": "zhitong/tensorrt_engine.py", "status": "NEED_ENABLE"},
+    "证据上传": {"file": "api/routers/violations.py", "status": "COMPLETE"},
+    "微信小程序": {"file": "wechat-miniprogram/", "status": "NEED_FIX"}
+  },
+
+  "recommended_fix_order": [
+    {
+      "step": 1,
+      "issue_id": "ISSUE-002",
+      "action": "修复Vue组件图标导入",
+      "files_to_modify": ["e:\\output\\1\\web-admin\\src\\views\\ViolationDetail.vue"]
+    },
+    {
+      "step": 2,
+      "issue_id": "ISSUE-005",
+      "action": "解决数据库字段同步",
+      "files_to_modify": ["e:\\output\\1\\api\\models.py"],
+      "note": "先执行此步骤，避免后续测试受影响"
+    },
+    {
+      "step": 3,
+      "issue_id": "ISSUE-006",
+      "action": "添加API超时处理",
+      "files_to_modify": ["e:\\output\\1\\api\\image_recognizer.py"]
+    },
+    {
+      "step": 4,
+      "issue_id": "ISSUE-004",
+      "action": "修复微信小程序baseUrl",
+      "files_to_modify": ["e:\\output\\1\\wechat-miniprogram\\app.js"]
+    },
+    {
+      "step": 5,
+      "issue_id": "ISSUE-003",
+      "action": "启用TensorRT加速",
+      "files_to_modify": ["e:\\output\\1\\zhitong\\config.py", "e:\\output\\1\\zhitong\\tensorrt_engine.py"],
+      "note": "需要先生成engine文件，耗时较长"
+    },
+    {
+      "step": 6,
+      "issue_id": "ISSUE-007",
+      "action": "统一日志系统",
+      "files_to_modify": ["e:\\output\\1\\api\\*.py", "e:\\output\\1\\zhitong\\*.py"]
+    },
+    {
+      "step": 7,
+      "issue_id": "ISSUE-008",
+      "action": "添加单元测试",
+      "note": "建议最后执行，建立测试后再重构"
+    }
+  ],
+
+  "verification_commands": {
+    "backend_health": "curl.exe -s http://127.0.0.1:8001/health",
+    "frontend_build": "cd e:\\output\\1\\web-admin && npx vite build",
+    "python_syntax": "py -3 -c \"import ast; ast.parse(open('e:/output/1/api/image_recognizer.py', encoding='utf-8').read())\"",
+    "api_test": "py -3 e:\\output\\1\\api\\test_api.py"
+  },
+
+  "notes": {
+    "excluded_issues": "安全问题(ISSUE-001 API Key硬编码)已排除，请单独处理",
+    "project_type": "Python FastAPI后端 + Vue3前端 + 微信小程序",
+    "main_dependencies": "ultralytics, dashscope, deep-sort-realtime, opencv-python"
+  }
+}

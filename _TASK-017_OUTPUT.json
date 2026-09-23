@@ -1,0 +1,83 @@
+{
+  "task": "TASK-017",
+  "timestamp": "2026-07-23T11:52:30",
+  "status": "PASS",
+  "details": {
+    "services": {
+      "backend": {
+        "port": 8001,
+        "status": "running",
+        "models": 7,
+        "models_list": ["yolov8n", "yolov8s", "vehicle", "helmet", "traffic_light", "lane", "license_plate"],
+        "gpu_enabled": true
+      },
+      "frontend": {
+        "port": 5173,
+        "status": "running",
+        "proxy_configured": true
+      },
+      "digital_twin": {
+        "port": 5000,
+        "status": "running",
+        "websocket_enabled": true,
+        "simulation_active": true
+      }
+    },
+    "camera_test": {
+      "available_cameras": 4,
+      "indexes": [0, 1, 2, 3],
+      "resolution": "640x480",
+      "fps": 30,
+      "capture_test": {
+        "frames": 10,
+        "success_rate": 100,
+        "elapsed_time": "0.82s",
+        "real_fps": 12.14
+      }
+    },
+    "realtime_detection": {
+      "status": "running",
+      "camera_index": 0,
+      "frame_rate": 3,
+      "total_frames": 426,
+      "processed_frames": 34,
+      "snapshot_available": true
+    },
+    "cloud_review": {
+      "doubao": {
+        "success": false,
+        "message": "Invalid image input"
+      },
+      "deepseek": {
+        "success": true,
+        "violation_confirmed": false,
+        "confidence_adjusted": 0.05,
+        "risk_level": "high"
+      },
+      "duration_ms": 1397,
+      "dual_images": true,
+      "context_frames": 4,
+      "link_available": true
+    },
+    "api_endpoints": {
+      "/api/realtime/start": "OK",
+      "/api/realtime/status": "OK",
+      "/api/realtime/snapshot": "OK",
+      "/api/realtime/consult": "OK",
+      "/api/realtime/camera/list": "OK",
+      "/api/traffic": "OK",
+      "/api/violations": "OK",
+      "/api/stats": "OK",
+      "/api/real-violations": "OK",
+      "/api/cameras": "OK"
+    },
+    "notes": [
+      "所有服务端口无冲突",
+      "本地YOLO检测正常运行",
+      "摄像头接入成功，支持4路输入",
+      "云端复核链路已连通（DeepSeek正常）",
+      "数字孪生模拟数据正常生成",
+      "前端可访问，代理配置正确"
+    ]
+  }
+}

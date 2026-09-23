@@ -22,9 +22,18 @@ from datetime import datetime
 from typing import Dict, List, Any, Optional
 import requests
 
-# DeepSeek API配置
-DEEPSEEK_API_KEY = "***REMOVED***"
-DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
+def _get_deepseek_key():
+    """从 config_manager 获取 DeepSeek API Key"""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from config_manager import load_config
+        cfg = load_config()
+        key = cfg.get('deepseek', {}).get('api_key', '')
+        if key:
+            return key
+    except:
+        pass
+    return ""  # 没有就返回空字符串，不硬编码
 
 class BackendEvaluator:
     """后端评估器"""
@@ -38,8 +47,12 @@ class BackendEvaluator:
     def call_deepseek_api(self, prompt: str) -> str:
         """调用DeepSeek API进行智能分析"""
         try:
+            api_key = _get_deepseek_key()
+            if not api_key:
+                return "DeepSeek API Key 未配置"
+            
             headers = {
-                "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json"
             }
             
@@ -59,7 +72,7 @@ class BackendEvaluator:
                 "max_tokens": 2000
             }
             
-            response = requests.post(DEEPSEEK_API_URL, headers=headers, json=data, timeout=30)
+            response = requests.post("https://api.deepseek.com/v1/chat/completions", headers=headers, json=data, timeout=30)
             
             if response.status_code == 200:
                 result = response.json()

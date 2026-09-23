@@ -1,0 +1,10 @@
+path: E:\output\1\zhitong\data\vehicle_final
+train: images/train
+val: images/val
+test: images/test
+nc: 4
+names:
+  0: car
+  1: motorcycle
+  2: truck
+  3: bus

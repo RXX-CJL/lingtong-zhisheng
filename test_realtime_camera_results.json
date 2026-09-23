@@ -1,0 +1,241 @@
+{
+  "page_load": true,
+  "page_title": "智瞳灵声管理端",
+  "video_element_exists": true,
+  "video_attributes": {
+    "autoplay": "",
+    "playsinline": "",
+    "muted": null,
+    "class": "video-feed",
+    "style": "visibility: hidden; opacity: 0;",
+    "display": "block",
+    "visibility": "hidden",
+    "opacity": "0",
+    "width": 920,
+    "height": 518,
+    "videoWidth": 0,
+    "videoHeight": 0,
+    "readyState": 0,
+    "paused": true
+  },
+  "start_button_exists": true,
+  "console_errors": [],
+  "console_logs": [
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "log",
+      "text": "[Camera] Starting camera..."
+    },
+    {
+      "type": "log",
+      "text": "[Camera] Got media stream, tracks: 1"
+    },
+    {
+      "type": "log",
+      "text": "[Camera] Video element: {videoWidth: 0, videoHeight: 0, readyState: 0, paused: true, muted: true}"
+    },
+    {
+      "type": "log",
+      "text": "[Camera] Set srcObject"
+    },
+    {
+      "type": "log",
+      "text": "[Camera] loadedmetadata event"
+    },
+    {
+      "type": "log",
+      "text": "[Camera] Attempting to play..."
+    },
+    {
+      "type": "log",
+      "text": "[Camera] loadeddata event"
+    },
+    {
+      "type": "log",
+      "text": "[Camera] canplay event"
+    },
+    {
+      "type": "log",
+      "text": "[Camera] playing event"
+    },
+    {
+      "type": "log",
+      "text": "[Camera] Playback started successfully"
+    },
+    {
+      "type": "log",
+      "text": "[Camera] Video state after play: {videoWidth: 1280, videoHeight: 720, readyState: 4, paused: false, offsetWidth: 920}"
+    }
+  ],
+  "network_requests": [
+    {
+      "url": "http://localhost:5173/realtime",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/@vite/client",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/src/main.js?t=1784816833046",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/node_modules/vite/dist/client/env.mjs",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite-cache/deps/vue.js?v=f578491d",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite-cache/deps/pinia.js?v=f578491d",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite-cache/deps/element-plus.js?v=f578491d",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/node_modules/element-plus/dist/index.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite-cache/deps/@element-plus_icons-vue.js?v=f578491d",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/src/App.vue",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/src/router/index.js?t=1784816833046",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/src/styles/global.scss",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite-cache/deps/chunk-R4IPVHRQ.js?v=f578491d",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite-cache/deps/chunk-G3PMV62Z.js?v=f578491d",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite-cache/deps/chunk-YFT6OQ5R.js?v=f578491d",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite-cache/deps/chunk-BJZ2CCBT.js?v=f578491d",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite-cache/deps/vue-router.js?v=f578491d",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/src/App.vue?vue&type=style&index=0&scoped=7a7a37b1&lang.scss",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/@id/__x00__plugin-vue:export-helper",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/src/views/RealTimeMonitor.vue?t=1784816833046",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/src/api/index.js?t=1784810946625",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/src/views/RealTimeMonitor.vue?t=1784816833046&vue&type=style&index=0&scoped=bd41d4d5&lang.scss",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite-cache/deps/axios.js?v=f578491d",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8001/api/realtime/detect-frame",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:8001/api/realtime/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8001/api/realtime/detect-frame",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:8001/api/realtime/detect-frame",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:8001/api/realtime/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8001/api/realtime/detect-frame",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:8001/api/realtime/detect-frame",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:8001/api/realtime/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8001/api/realtime/detect-frame",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:8001/api/realtime/detect-frame",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:8001/api/realtime/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8001/api/realtime/detect-frame",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:8001/api/realtime/detect-frame",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:8001/api/realtime/status",
+      "method": "GET"
+    }
+  ],
+  "screenshot_before": "e:\\output\\screenshot_realtime_before.png",
+  "screenshot_after": "e:\\output\\screenshot_realtime_after.png",
+  "video_attributes_after": {
+    "display": "block",
+    "visibility": "visible",
+    "opacity": "1",
+    "width": 920,
+    "height": 518,
+    "videoWidth": 1280,
+    "videoHeight": 720,
+    "readyState": 4,
+    "paused": false,
+    "srcObject": "exists"
+  }
+}

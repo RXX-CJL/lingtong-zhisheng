@@ -1,0 +1,180 @@
+/* pages/statistics/statistics.wxss */
+
+/* 数字卡片区 */
+.stats-grid {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 -10rpx 20rpx;
+}
+
+.stat-card {
+  width: 50%;
+  padding: 0 10rpx 20rpx;
+  box-sizing: border-box;
+}
+
+.stat-card .stat-num {
+  display: block;
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 30rpx;
+  text-align: center;
+  font-size: 48rpx;
+  font-weight: bold;
+  color: #1890ff;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.05);
+}
+
+.stat-card .stat-label {
+  display: block;
+  text-align: center;
+  font-size: 24rpx;
+  color: #999;
+  margin-top: 10rpx;
+}
+
+/* 审核统计 */
+.status-grid {
+  display: flex;
+  justify-content: space-around;
+  padding: 20rpx 0;
+}
+
+.status-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.status-item .stat-num {
+  font-size: 40rpx;
+  font-weight: bold;
+}
+
+.status-item .stat-num.pending {
+  color: #faad14;
+}
+
+.status-item .stat-num.confirmed {
+  color: #52c41a;
+}
+
+.status-item .stat-num.rejected {
+  color: #8c8c8c;
+}
+
+.status-item .stat-label {
+  font-size: 24rpx;
+  color: #999;
+  margin-top: 8rpx;
+}
+
+/* 违规类型列表 */
+.section-title {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 20rpx;
+  padding-bottom: 16rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.type-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.type-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.type-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.type-count {
+  font-size: 26rpx;
+  color: #666;
+}
+
+.type-bar {
+  height: 12rpx;
+  background: #f0f0f0;
+  border-radius: 6rpx;
+  overflow: hidden;
+}
+
+.type-bar-fill {
+  height: 100%;
+  border-radius: 6rpx;
+  transition: width 0.3s ease;
+}
+
+.bg-red_light {
+  background: #ff4d4f;
+}
+
+.bg-no_helmet {
+  background: #fa8c16;
+}
+
+.bg-wrong_way {
+  background: #722ed1;
+}
+
+.bg-illegal_parking {
+  background: #eb2f96;
+}
+
+.bg-lane_departure {
+  background: #13c2c2;
+}
+
+.bg-speeding {
+  background: #f5222d;
+}
+
+/* 排名卡片 */
+.rank-card {
+  text-align: center;
+}
+
+.rank-title {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 20rpx;
+  padding-bottom: 16rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.rank-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20rpx 0;
+}
+
+.rank-num {
+  font-size: 56rpx;
+  font-weight: bold;
+  color: #1890ff;
+}
+
+.rank-tip {
+  font-size: 24rpx;
+  color: #999;
+  margin-top: 10rpx;
+}
+
+/* 空状态 */
+.empty {
+  text-align: center;
+  padding: 40rpx;
+  color: #999;
+}

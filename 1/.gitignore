@@ -1,0 +1,109 @@
+# =============================================================================
+# 智瞳灵声项目 .gitignore
+# 建立日期: 2026-09-23
+# =============================================================================
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+
+# --- 虚拟环境 ---
+.venv/
+venv/
+env/
+
+# --- Node.js ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- 大文件 / 二进制依赖 ---
+*.whl
+*.egg
+
+# --- 模型权重 (体积大,按需下载) ---
+# 注意: 已在 git 中的模型文件保留,新增的不纳入
+# api/yolov8n.pt
+# data/models/yolov8n.pt
+# zhitong/models/yolov8n.pt
+# zhitong/training/models/*.pt
+*.kmodel
+*.engine
+*.onnx
+*.tflite
+
+# --- 数据库 (运行时生成,不应提交) ---
+# 注意: zhitong_violations.db 已在初始提交中,保留
+# api/zhitong.db
+# api/zhitong_violations.db
+
+# --- 上传文件 / 运行时产物 ---
+api/uploads/*
+!api/uploads/.gitkeep
+api/diag_frame.jpg
+api/event_videos/
+
+# --- 运行输出 ---
+output/logs/*.log
+output/logs/*.txt
+runs/
+test_results/
+
+# --- 配置 / 密钥 (含敏感信息) ---
+api/config_runtime.json
+.env
+.env.*
+*.secret
+
+# --- IDE / 编辑器 ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- 操作系统 ---
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# --- 缓存 ---
+.cache/
+*.tmp
+*.bak
+
+# --- CARLA (大体积仿真环境) ---
+carla/CARLA_0.9.16/
+
+# --- 固件备份 (大体积二进制) ---
+固件备份/
+
+# --- K230 硬件资源 (6K+ 文件,不适合纳入 Git) ---
+K230/
+
+# --- 训练数据集 / 大规模图片目录 ---
+zhitong/training/
+zhitong/k230_training/
+zhitong/data_tools/
+zhitong/data/extracted_frames/
+zhitong/data/helmet_dataset/
+zhitong/data/helmet_final/
+zhitong/data/traffic_light_dataset/
+zhitong/data/traffic_light_final/
+zhitong/data/vehicle_dataset/
+zhitong/data/vehicle_final/
+zhitong/data/test_images/
+
+# --- 构建缓存 ---
+miniprogram/.swc/
+
+# --- 临时 / 测试图片 (非种子数据) ---
+api/uploads/realtime_*.jpg
+api/uploads/upload_*.jpg
+api/uploads/violation_*.jpg

@@ -1,0 +1,9 @@
+path: E:\output\1\zhitong\data\traffic_light_final
+train: images/train
+val: images/val
+test: images/test
+nc: 3
+names:
+  0: red_light
+  1: yellow_light
+  2: green_light

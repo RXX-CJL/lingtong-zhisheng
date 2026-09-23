@@ -1,0 +1,42 @@
+{
+    "app": {
+        "name": "智慧交通数字孪生系统",
+        "version": "1.0.0",
+        "description": "基于Three.js的交通数字孪生可视化系统"
+    },
+    "scene": {
+        "width": 120,
+        "height": 120,
+        "fog": true,
+        "fog_near": 100,
+        "fog_far": 300,
+        "camera_position": [50, 40, 50],
+        "camera_target": [0, 0, 0]
+    },
+    "traffic": {
+        "max_vehicles": 50,
+        "vehicle_spawn_rate": 0.1,
+        "min_speed": 20,
+        "max_speed": 60,
+        "violation_probability": 0.15
+    },
+    "colors": {
+        "background": "#1a1a2e",
+        "road": "#333333",
+        "ground": "#2E7D32",
+        "building": "#546E7A",
+        "vehicles": {
+            "normal": "#4CAF50",
+            "violation": "#FF5722",
+            "red_light": "#F44336",
+            "no_helmet": "#FF9800",
+            "illegal_parking": "#9C27B0",
+            "speeding": "#E91E63"
+        }
+    },
+    "server": {
+        "host": "0.0.0.0",
+        "port": 8000,
+        "debug": true
+    }
+}

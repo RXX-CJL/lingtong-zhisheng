@@ -1,0 +1,43 @@
+{
+  "task": "TASK-FIX-ORANGE-MONITOR",
+  "task_name": "实时监控橙色画面修复（4处联动修复）",
+  "timestamp": "2026-08-31T13:10:00+08:00",
+  "status": "PASS",
+  "details": {
+    "root_cause": "双链路混合问题：1) 前端 /realtime 页面 getUserMedia 后未显式 .play() 且未等 loadedmetadata 导致 videoWidth/Height=0；2) /ai-detect 页面 cv2.VideoCapture 在 Windows 默认后端(MSMF) 打开笔记本摄像头失败率高（60%+），get_annotated_frame 返回 None → MJPEG 流 yield 空循环 → 前端 img 显示异常（橙色或空白占位）。",
+    "fixes_applied": 4,
+    "fix_2a": {
+      "file": "e:\\output\\1\\web-admin\\src\\views\\RealTimeMonitor.vue",
+      "change": "startDetection() 增加：显式调用 play() + await loadedmetadata 3s 超时兜底；异常分支清理 mediaStream；videoWidth>0 才认为就绪"
+    },
+    "fix_2b": {
+      "file": "e:\\output\\1\\api\\realtime_detector.py",
+      "change": "start_camera() Windows 优先 cv2.CAP_DSHOW + 默认后端双重尝试 + 首帧 read 验证；新增 _make_diagnostic_frame()；get_annotated_frame() 永不返回 None（输出深蓝诊断帧+提示）"
+    },
+    "fix_2c": {
+      "file": "e:\\output\\1\\api\\routers\\realtime.py",
+      "change": "/stream 路由增加 _fallback_diagnostic 双重保险；异常捕获改为输出诊断帧而非崩溃"
+    },
+    "fix_2d": {
+      "file": "e:\\output\\1\\api\\routers\\rtsp_stream.py",
+      "change": "_local_camera_worker 双后端+首帧验证；打开失败进入诊断帧循环而非 return；generate_mjpeg_stream 无帧时每 0.25s 输出一张诊断帧"
+    },
+    "verification": {
+      "python_ast_3_files": "PASS",
+      "diagnostic_frame_dimensions": "1280x720 uint8",
+      "diagnostic_frame_jpeg_size_bytes": 97503,
+      "standalone_make_diagnostic_frame": "PASS (65332 bytes)",
+      "get_annotated_frame_no_longer_returns_None": "PASS",
+      "6_yolo_models_loaded_on_gpu": "PASS"
+    }
+  },
+  "feedback": {
+    "project_suggestions": [],
+    "commander_suggestions": [
+      "两个监控页功能定位不同，建议在前端菜单栏标注：/realtime（浏览器直接取摄像头，零依赖，推荐） /ai-detect（后端cv2取流，适合摄像头不在本机的场景）",
+      "同一个物理摄像头不能同时被浏览器和cv2占用，如果两边同时启动会冲突（一边画面正常一边返回诊断帧），建议增加互斥提示"
+    ],
+    "dissent": [],
+    "suggestions_adopted": []
+  }
+}

@@ -13,6 +13,12 @@ class ViolationEvidenceCreate(BaseModel):
     image_data: Optional[str] = Field(None, description="图片Base64数据")
     video_data: Optional[str] = Field(None, description="视频Base64数据")
     additional_info: Optional[Dict[str, Any]] = Field(None, description="附加信息")
+    # M04: 车牌绑定字段
+    plate_number: Optional[str] = Field(None, description="车牌号")
+    plate_confidence: Optional[float] = Field(None, ge=0.0, le=1.0, description="车牌识别置信度")
+    plate_image_data: Optional[str] = Field(None, description="车牌小图Base64数据")
+    plate_color: Optional[str] = Field(None, description="车牌颜色: blue/green/yellow/unknown")
+    confirmed_frames: Optional[int] = Field(None, ge=0, description="多帧确认命中数")
 
 class ViolationEvidenceResponse(BaseModel):
     """违规证据响应模型"""
@@ -27,10 +33,17 @@ class ViolationEvidenceResponse(BaseModel):
     additional_info: Optional[Dict[str, Any]]
     cloud_validated: bool
     cloud_result: Optional[str]
+    yolo_detection_result: Optional[Dict[str, Any]]
     status: str
+    # M04: 车牌绑定字段
+    plate_number: Optional[str] = ''
+    plate_confidence: Optional[float] = 0.0
+    plate_image_path: Optional[str] = ''
+    plate_color: Optional[str] = 'unknown'
+    confirmed_frames: Optional[int] = 0
     created_at: str
     updated_at: str
-    
+
     class Config:
         from_attributes = True
 
@@ -97,3 +110,64 @@ class ApiResponse(BaseModel):
     message: str = Field(..., description="响应消息")
     data: Optional[Any] = Field(None, description="响应数据")
     error_code: Optional[str] = Field(None, description="错误码")
+
+# 用户认证模型
+class UserCreate(BaseModel):
+    """创建用户请求模型"""
+    username: str = Field(..., min_length=3, max_length=50, description="用户名")
+    password: str = Field(..., min_length=6, max_length=100, description="密码")
+    name: Optional[str] = Field(None, max_length=50, description="姓名")
+    email: Optional[str] = Field(None, max_length=100, description="邮箱")
+
+class UserUpdate(BaseModel):
+    """更新用户请求模型"""
+    role: Optional[str] = Field(None, description="角色")
+    is_active: Optional[bool] = Field(None, description="是否激活")
+    name: Optional[str] = Field(None, max_length=50, description="姓名")
+    email: Optional[str] = Field(None, max_length=100, description="邮箱")
+
+class UserResponse(BaseModel):
+    """用户响应模型"""
+    id: int
+    username: str
+    name: str
+    role: str
+    email: Optional[str]
+    is_active: bool
+    created_at: str
+
+class LoginResponse(BaseModel):
+    """登录响应模型"""
+    access_token: str
+    token_type: str
+    user: UserResponse
+
+# 设备管理模型
+class DeviceCreate(BaseModel):
+    """创建设备请求模型"""
+    device_id: str = Field(..., description="设备ID")
+    name: str = Field(..., description="设备名称")
+    device_type: str = Field(..., description="设备类型")
+    location: Optional[str] = Field(None, description="位置描述")
+    latitude: Optional[float] = Field(None, description="纬度")
+    longitude: Optional[float] = Field(None, description="经度")
+
+class DeviceUpdate(BaseModel):
+    """更新设备请求模型"""
+    name: Optional[str] = Field(None, description="设备名称")
+    status: Optional[str] = Field(None, description="状态")
+    location: Optional[str] = Field(None, description="位置描述")
+    latitude: Optional[float] = Field(None, description="纬度")
+    longitude: Optional[float] = Field(None, description="经度")
+
+# 申诉管理模型
+class AppealCreate(BaseModel):
+    """创建申诉请求模型"""
+    violation_id: int = Field(..., description="违规记录ID")
+    reason: str = Field(..., description="申诉理由")
+    contact: Optional[str] = Field(None, description="联系方式")
+
+class AppealProcess(BaseModel):
+    """处理申诉请求模型"""
+    status: str = Field(..., description="处理结果")
+    result: str = Field(..., description="处理备注")

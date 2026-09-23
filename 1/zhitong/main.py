@@ -13,6 +13,7 @@ from violation_detector import ViolationDetector
 from speech_manager import SpeechManager
 from cloud_manager import CloudManager
 from warning_manager import WarningManager
+from api_client import APIClient
 
 class ZhiTongSystem:
     def __init__(self):
@@ -41,6 +42,9 @@ class ZhiTongSystem:
         
         self.warning_manager = WarningManager()
         print("✓ 分级警告系统已加载")
+        
+        self.api_client = APIClient(self.config)
+        print("✓ API客户端已加载")
         
         self.running = False
         self.current_frame = None
@@ -178,9 +182,11 @@ class ZhiTongSystem:
                 record.last_warning_time = datetime.now()
             
             if response_level == "high":
-                self.cloud_manager.save_evidence(frame, vio)
+                evidence_path = self.cloud_manager.save_evidence(frame, vio)
+                self.api_client.submit_violation(vio, frame)
             elif response_level == "medium" and need_cloud:
                 self.cloud_manager.add_to_queue(vio, frame.copy())
+                self.api_client.submit_violation(vio, frame.copy())
     
     def on_space(self):
         if self.last_detected_objects:
@@ -200,6 +206,9 @@ class ZhiTongSystem:
     def on_q(self):
         self.running = False
         print("\n正在退出...")
+        print("等待API上传队列清空...")
+        self.api_client.stop()
+        print("API上传已完成")
     
     def start(self):
         cam_index = self.detect_cameras()

@@ -1,0 +1,28 @@
+{
+  "task": "TASK-024-M1",
+  "timestamp": "2026-07-24T11:30:00+08:00",
+  "status": "PASS",
+  "details": {
+    "scheme": "getUserMedia",
+    "video_ready": true,
+    "video_ready_state": 4,
+    "fps_display": "1.1 FPS",
+    "frontend_build": "success",
+    "backend_health": {
+      "status": "healthy",
+      "version": "2.0.0",
+      "yolo_available": true,
+      "overall": "ok"
+    },
+    "changes_made": [
+      "移除了MJPEG流相关的img标签和resultImageUrl逻辑",
+      "添加了drawCanvas覆盖层用于绘制识别框",
+      "实现了drawDetectionBoxes函数在canvas上绘制YOLO识别框",
+      "修改了CSS样式，video始终显示，drawCanvas覆盖在video上方",
+      "识别框支持缩放和偏移，适配不同视频尺寸"
+    ],
+    "console_errors": 0
+  },
+  "deviations": ["截图因浏览器超时未成功，但视频流已确认就绪"],
+  "screenshot_path": ["e:\\output\\screenshots\\TASK-024-M1-realtime.png"]
+}

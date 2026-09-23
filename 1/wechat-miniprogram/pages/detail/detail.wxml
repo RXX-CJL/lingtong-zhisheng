@@ -1,0 +1,84 @@
+<!--pages/detail/detail.wxml-->
+<view class="container" wx:if="{{detail}}">
+  <!-- 图片区域 -->
+  <view class="card image-card">
+    <image
+      class="detail-image"
+      mode="widthFix"
+      src="{{imageUrl}}"
+      bindtap="previewImage"
+    />
+  </view>
+
+  <!-- 基本信息 -->
+  <view class="card info-card">
+    <view class="info-row">
+      <text class="info-label">违规类型</text>
+      <text class="badge-{{detail.violation_type}}">{{detail.violation_type_name}}</text>
+    </view>
+    <view class="info-divider"></view>
+    <view class="info-row">
+      <text class="info-label">举报时间</text>
+      <text class="info-value">{{detail.created_at}}</text>
+    </view>
+    <view class="info-divider"></view>
+    <view class="info-row">
+      <text class="info-label">置信度</text>
+      <text class="info-value">{{detail.confidence}}</text>
+    </view>
+    <view class="info-divider"></view>
+    <view class="info-row">
+      <text class="info-label">审核状态</text>
+      <text class="badge-{{detail.status}}">{{detail.status_name}}</text>
+    </view>
+    <view class="info-divider" wx:if="{{detail.remark}}"></view>
+    <view class="info-row" wx:if="{{detail.remark}}">
+      <text class="info-label">补充说明</text>
+      <text class="info-value">{{detail.remark}}</text>
+    </view>
+  </view>
+
+  <!-- 云端分析结果 -->
+  <view class="card cloud-card" wx:if="{{detail.cloud_validated}}">
+    <view class="cloud-title">
+      <text class="cloud-icon">☁️</text>
+      <text>云端分析结果</text>
+    </view>
+    <view class="info-divider"></view>
+    <view class="info-row">
+      <text class="info-label">分析时间</text>
+      <text class="info-value">{{detail.cloud_validated_at}}</text>
+    </view>
+    <view class="info-divider"></view>
+    <view class="info-row">
+      <text class="info-label">AI分析</text>
+      <text class="info-value">{{detail.ai_result}}</text>
+    </view>
+  </view>
+
+  <!-- 审核信息 -->
+  <view class="card review-card" wx:if="{{detail.status !== 'pending'}}">
+    <view class="review-title">审核信息</view>
+    <view class="info-divider"></view>
+    <view class="info-row">
+      <text class="info-label">审核时间</text>
+      <text class="info-value">{{detail.reviewed_at}}</text>
+    </view>
+    <view class="info-divider"></view>
+    <view class="info-row" wx:if="{{detail.review_comment}}">
+      <text class="info-label">审核意见</text>
+      <text class="info-value">{{detail.review_comment}}</text>
+    </view>
+  </view>
+</view>
+
+<!-- 加载状态 -->
+<view class="loading-container" wx:if="{{loading}}">
+  <text>加载中...</text>
+</view>
+
+<!-- 错误状态 -->
+<view class="error-container" wx:if="{{!loading && !detail}}">
+  <text>加载失败，请返回重试</text>
+  <view class="retry-btn" bindtap="loadDetail">重试</view>
+</view>

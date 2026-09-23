@@ -1,0 +1,189 @@
+@import '../../styles/variables.scss';
+
+.report-page {
+  min-height: 100vh;
+  background-color: $color-bg-page;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 120rpx);
+}
+
+.report-card {
+  margin: $page-padding;
+  padding: $spacing-lg;
+  background-color: $color-bg-card;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-card;
+}
+
+.card-section {
+  margin-bottom: $spacing-xl;
+
+  &:last-of-type {
+    margin-bottom: $spacing-xl;
+  }
+}
+
+.section-title {
+  display: block;
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  margin-bottom: $spacing-md;
+}
+
+.type-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-sm;
+}
+
+.type-radio {
+  margin: 0;
+  padding: 0;
+}
+
+.type-option {
+  @include button-reset;
+  width: calc(33.33% - 12rpx);
+  height: 120rpx;
+  background-color: $color-bg-page;
+  border-radius: $radius-md;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx solid transparent;
+  transition: all $transition-base;
+
+  &.selected {
+    background-color: rgba($color-primary, 0.1);
+    border-color: $color-primary;
+  }
+}
+
+.type-icon {
+  font-size: 40rpx;
+  margin-bottom: $spacing-xs;
+}
+
+.type-label {
+  font-size: $font-size-sm;
+  color: $color-text-primary;
+}
+
+.image-upload {
+  width: 100%;
+  height: 320rpx;
+  border: 2rpx dashed $color-border;
+  border-radius: $radius-md;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+
+  &.has-image {
+    border: none;
+  }
+}
+
+.upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.upload-icon {
+  font-size: 64rpx;
+  margin-bottom: $spacing-sm;
+}
+
+.upload-text {
+  font-size: $font-size-md;
+  color: $color-text-tertiary;
+}
+
+.uploaded-image {
+  width: 100%;
+  height: 100%;
+}
+
+.description-input {
+  width: 100%;
+  height: 200rpx;
+  padding: $spacing-md;
+  background-color: $color-bg-page;
+  border-radius: $radius-md;
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  box-sizing: border-box;
+}
+
+.input-count {
+  display: block;
+  text-align: right;
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-top: $spacing-xs;
+}
+
+.location-input-wrap {
+  display: flex;
+  align-items: flex-start;
+  padding: $spacing-md;
+  background-color: $color-bg-page;
+  border-radius: $radius-md;
+}
+
+.location-icon {
+  font-size: $font-size-lg;
+  margin-right: $spacing-sm;
+  margin-top: $spacing-xs;
+}
+
+.location-input {
+  flex: 1;
+  height: 80rpx;
+  font-size: $font-size-md;
+  color: $color-text-primary;
+}
+
+.submit-btn {
+  @include button-reset;
+  width: 100%;
+  height: $button-height-lg;
+  background: linear-gradient(135deg, $color-primary 0%, $color-primary-light 100%);
+  border-radius: $radius-button;
+  margin-top: $spacing-xl;
+
+  &:active {
+    opacity: 0.9;
+    transform: scale(0.98);
+  }
+}
+
+.submit-text {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-white;
+}
+
+.tips-section {
+  margin: $page-padding;
+  padding: $spacing-lg;
+  background-color: rgba($color-primary, 0.05);
+  border-radius: $radius-md;
+}
+
+.tips-title {
+  display: block;
+  font-size: $font-size-md;
+  font-weight: $font-weight-medium;
+  color: $color-primary;
+  margin-bottom: $spacing-md;
+}
+
+.tips-item {
+  display: block;
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  line-height: 2;
+}

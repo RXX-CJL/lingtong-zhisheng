@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧交通数字孪生系统</title>
+    <link rel="stylesheet" href="../static/css/style.css">
+</head>
+<body>
+    <div id="app">
+        <div id="header">
+            <div class="logo">
+                <span class="icon">🚦</span>
+                <span>智慧交通数字孪生系统</span>
+            </div>
+            <div class="header-info">
+                <span id="current-time">--:--:--</span>
+                <span id="connection-status" class="status offline">未连接</span>
+                <span id="traffic-phase" class="phase-indicator">南北直行</span>
+            </div>
+        </div>
+        
+        <div id="main-content">
+            <div id="scene-container">
+                <canvas id="canvas"></canvas>
+                <div id="scene-controls">
+                    <button id="btn-rotate" class="control-btn active">旋转</button>
+                    <button id="btn-zoom" class="control-btn">缩放</button>
+                    <button id="btn-pan" class="control-btn">平移</button>
+                    <button id="btn-reset" class="control-btn">重置视角</button>
+                </div>
+                <div id="legend">
+                    <div class="legend-item"><span class="legend-dot" style="background:#4CAF50"></span>正常车辆</div>
+                    <div class="legend-item"><span class="legend-dot" style="background:#FF5722"></span>违规车辆</div>
+                    <div class="legend-item"><span class="legend-dot" style="background:#F44336"></span>闯红灯</div>
+                    <div class="legend-item"><span class="legend-dot" style="background:#FF9800"></span>未戴头盔</div>
+                </div>
+            </div>
+            
+            <div id="sidebar">
+                <div class="panel">
+                    <h3>实时监控</h3>
+                    <div id="vehicle-list" class="scroll-list"></div>
+                </div>
+                
+                <div class="panel">
+                    <h3>违规告警</h3>
+                    <div id="violation-list" class="scroll-list"></div>
+                </div>
+                
+                <div class="panel">
+                    <h3>统计信息</h3>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-value" id="stat-total">0</span>
+                            <span class="stat-label">总车辆数</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value warning" id="stat-violations">0</span>
+                            <span class="stat-label">违规数</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="stat-flow">0</span>
+                            <span class="stat-label">流量(辆/分)</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="stat-speed">0</span>
+                            <span class="stat-label">平均速度(km/h)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- M14: 今日违规分类仪表盘 -->
+                <div class="panel">
+                    <h3>今日违规分类（M14）</h3>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-value" id="stat-red-light" style="color:#F44336">0</span>
+                            <span class="stat-label">闯红灯</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="stat-wrong-way" style="color:#FF9800">0</span>
+                            <span class="stat-label">逆行</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="stat-no-helmet" style="color:#00BCD4">0</span>
+                            <span class="stat-label">未戴头盔</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="stat-illegal-parking" style="color:#9C27B0">0</span>
+                            <span class="stat-label">违规停车</span>
+                        </div>
+                    </div>
+                    <div class="realtime-sync-info">
+                        <div><span>平均 FPS:</span><span id="stat-avg-fps">0.0</span></div>
+                        <div><span>处理帧数:</span><span id="stat-processed-frames">0</span></div>
+                        <div><span>已确认:</span><span id="stat-confirmed-count">0</span></div>
+                        <div><span>待确认:</span><span id="stat-pending-count">0</span></div>
+                    </div>
+                </div>
+
+                <!-- M14: 演示违规场景按钮 -->
+                <div class="panel">
+                    <h3>违规场景演示（M14）</h3>
+                    <div class="demo-buttons">
+                        <button class="demo-btn" data-scene="wrong_way" style="background:#FF9800">
+                            演示逆行
+                        </button>
+                        <button class="demo-btn" data-scene="red_light" style="background:#F44336">
+                            演示闯红灯
+                        </button>
+                        <button class="demo-btn" data-scene="no_helmet" style="background:#00BCD4">
+                            演示未戴头盔
+                        </button>
+                        <button class="demo-btn" data-scene="illegal_parking" style="background:#9C27B0">
+                            演示违停
+                        </button>
+                    </div>
+                    <p class="demo-hint">点击按钮在 3D 场景中生成违规事件，含红色旋转箭头+车牌标注</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module" src="../static/js/main.js"></script>
+    <script type="module">
+        import { initScene, getScene } from '../static/js/main.js';
+        
+        const scene = initScene();
+        
+        // M14: 绑定演示按钮
+        document.querySelectorAll('.demo-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const sceneType = btn.dataset.scene;
+                if (scene && scene.triggerDemoScene) {
+                    scene.triggerDemoScene(sceneType);
+                }
+            });
+        });
+        
+        const vehicleList = document.getElementById('vehicle-list');
+        const violationList = document.getElementById('violation-list');
+        const statTotal = document.getElementById('stat-total');
+        const statViolations = document.getElementById('stat-violations');
+        const statFlow = document.getElementById('stat-flow');
+        const statSpeed = document.getElementById('stat-speed');
+        
+        let flowCount = 0;
+        let flowTimer = setInterval(() => {
+            statFlow.textContent = flowCount;
+            flowCount = 0;
+        }, 60000);
+        
+        function updateVehicleList(vehicles) {
+            vehicleList.innerHTML = '';
+            vehicles.forEach(v => {
+                const item = document.createElement('div');
+                item.className = 'vehicle-item';
+                item.innerHTML = `
+                    <div class="vehicle-info">
+                        <span class="vehicle-id">${v.id}</span>
+                        <span>${v.type}</span>
+                    </div>
+                    <span class="vehicle-speed">${Math.round(v.speed)} km/h</span>
+                `;
+                vehicleList.appendChild(item);
+            });
+        }
+        
+        function updateViolationList(violations) {
+            violationList.innerHTML = '';
+            violations.forEach(v => {
+                const item = document.createElement('div');
+                item.className = 'violation-item';
+                item.innerHTML = `
+                    <div class="violation-info">
+                        <span class="violation-type">${v.name}</span>
+                        <span>${v.id}</span>
+                    </div>
+                    <span class="violation-severity severity-${v.severity}">${v.severity === 'high' ? '严重' : v.severity === 'medium' ? '中等' : '轻微'}</span>
+                `;
+                violationList.appendChild(item);
+            });
+        }
+        
+        function updateStats(data) {
+            statTotal.textContent = data.total_vehicles;
+            statViolations.textContent = data.violating_vehicles;
+            
+            if (data.vehicles && data.vehicles.length > 0) {
+                const avgSpeed = data.vehicles.reduce((sum, v) => sum + v.speed, 0) / data.vehicles.length;
+                statSpeed.textContent = Math.round(avgSpeed);
+            }
+        }
+        
+        async function fetchData() {
+            try {
+                const response = await fetch('/api/traffic');
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    data.vehicles.forEach(v => {
+                        scene.addSimulatedVehicle(v);
+                    });
+                    
+                    updateVehicleList(data.vehicles);
+                    updateViolationList(data.violations || []);
+                    updateStats(data);
+                    
+                    flowCount += data.vehicles ? data.vehicles.length : 0;
+                }
+            } catch (e) {
+                console.log('模拟模式运行中');
+            }
+        }
+        
+        setInterval(fetchData, 1000);
+    </script>
+</body>
+</html>

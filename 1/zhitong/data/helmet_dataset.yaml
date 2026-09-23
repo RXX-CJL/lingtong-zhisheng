@@ -1,0 +1,8 @@
+path: E:\output\1\zhitong\data\helmet_final
+train: images/train
+val: images/val
+test: images/test
+nc: 2
+names:
+  0: helmet
+  1: no_helmet
