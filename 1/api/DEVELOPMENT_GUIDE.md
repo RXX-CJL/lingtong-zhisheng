@@ -18,12 +18,12 @@
 
 ### 可用API
 1. **DashScope API** (阿里云千问大模型)
-   - API Key: `***REMOVED***`
+   - API Key: 通过环境变量 `DASHSCOPE_API_KEY` 或 `api/config_runtime.json` 配置
    - 用途: 云端图像分析和违规验证
    - 已实现模块: `zhitong/cloud.py`
 
 2. **DeepSeek API**
-   - API Key: `***REMOVED***`
+   - API Key: 通过环境变量 `DEEPSEEK_API_KEY` 或 `api/config_runtime.json` 配置
    - 用途: 代码智能分析和开发辅助
 
 ### 现有项目基础

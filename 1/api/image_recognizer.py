@@ -203,7 +203,7 @@ def _get_dashscope_key():
     env_key = os.environ.get('DASHSCOPE_API_KEY', '')
     if env_key:
         return env_key
-    return "***REMOVED***"  # 最后的兜底
+    return ""  # 最后兜底返回空，由调用方处理未配置情况（Key 请通过环境变量或 config_runtime.json 配置）
 
 def find_model_path(model_key):
     """查找模型文件路径"""

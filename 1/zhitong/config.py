@@ -47,7 +47,7 @@ class Config:
     LANE_LINE_MAX_GAP = 50
     
     # 云端配置
-    DASHSCOPE_API_KEY = "***REMOVED***"
+    DASHSCOPE_API_KEY = os.environ.get('DASHSCOPE_API_KEY', '')
     CLOUD_MODEL = "qwen3-vl-flash"
     USE_CLOUD_VALIDATION = True
     

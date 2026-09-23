@@ -16,7 +16,7 @@ save_path = "/sdcard/snapshots/"
 prefix = time.ticks_us() % 10000
 i = 1
 
-API_KEY = "***REMOVED***"
+API_KEY = ""  # K230设备端请在此填入DashScope API Key
 WIFI_SSID = "MIT-Student"
 WIFI_KEY = "K230K230"
 

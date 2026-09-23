@@ -59,6 +59,7 @@ test_results/
 api/config_runtime.json
 .env
 .env.*
+!.env.example
 *.secret
 
 # --- IDE / 编辑器 ---

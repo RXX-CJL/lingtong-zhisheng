@@ -32,7 +32,7 @@ import pyaudio
 import numpy as np
 
 # ========== 1. 配置 ==========
-dashscope.api_key = "***REMOVED***"
+dashscope.api_key = os.environ.get('DASHSCOPE_API_KEY', '')
 dashscope.base_websocket_api_url = 'wss://dashscope.aliyuncs.com/api-ws/v1/inference'
 CLOUD_MODEL = "qwen3-vl-flash"
 TTS_MODEL = "qwen3-tts-flash"

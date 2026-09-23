@@ -21,7 +21,7 @@ spk_global = YbSpeaker()
 # 全局初始化标志
 media_manager_initialized = False
 
-API_KEY = "***REMOVED***"  # 请替换为您的API密钥
+API_KEY = ""  # K230设备端请在此填入DashScope API Key
 WIFI_SSID = "MIT-Student"
 WIFI_KEY = "K230K230"
 
