@@ -1552,3 +1552,49 @@ peer 要求随之从 `cordis ^4.0.2` 变为 `~4.0.4`（内核自带 4.0.4）—�
 
 **★ 已完成的清理**：`@liustack/modlens` **已移除**（`Packages: -24`，目录与 lockfile 双 0 命中）。
 
+### 27.10 ★gh 状态与 git 仓库治理（2026-10-16 第五轮）
+
+#### （1）gh：**早已登录**，此前记载有误
+
+| 项 | 实测值 |
+|---|---|
+| 账号 | **RXX-CJL**（keyring；scopes `repo` / `workflow` / `read:org` / `gist`） |
+| API | ✅ `gh api user` 通；配额 `limit=5000 remaining=4998` |
+| 目标仓库权限 | ✅ `RXX-CJL/lingtong-zhisheng` → `admin / maintain / push / triage / pull` **全 true** |
+| ★ 本轮修复 | `gh config set editor notepad` —— 原先 `editor=''`，会让 `gh pr create` / `gh issue create` 在**无 TTY 时卡在编辑器**上。（脚本调用仍建议显式带 `--body-file`） |
+| 文档修正 | §4 表格与 §7 待办里的"**尚未 `gh auth login`**"**已作废** —— §20 早在 2026-09-27 就记了已登录，是那两处没同步（文档自相矛盾）。 |
+
+#### （2）★ `E:\output` = GitHub 仓库的本地克隆（此前未在本文登记）
+
+- remote：`https://github.com/RXX-CJL/lingtong-zhisheng.git`，分支 `main`
+- **2026-10-16 完成首次完整推送**：`4a67b5a..a0822ab`（**7.45 MB / 735 blob**），本地与 `origin/main` **完全同步**
+- 本次留下 4 个提交：`8c3b5a4`（git 瘦身规则）· `d26bbab`（项目代码 109 文件）· `da9dd6e`（办公室文档 600 文件）· `a0822ab`（工具脚本 30 文件）；另含 10-13 的 `d88a7b6`
+
+#### （3）★★ 仓库瘦身：`.git` **1657.85 MB → 22.19 MB**（−98.7%）
+
+**诊断链（可复用）**：
+1. `git count-objects -vH` → `in-pack: 8700`、`size-pack: 1.61 GiB`，但 `garbage: 0`（说明 gc 没东西可清）
+2. `git rev-list --objects --all | git cat-file --batch-check=…` → **可达对象仅 1506 个 / 内容仅 36.08 MB**
+3. `git fsck --unreachable` → **7187 个 unreachable blob**（抽样 3000 个即 **889 MB**）
+4. `.git/filter-repo/` 目录存在 ⇒ **以前跑过历史重写，旧对象变悬空但从未回收**
+
+**处置**：`git reflog expire --expire=now --all` + `git gc --prune=now` → **0.4 秒完成**，回收 **1635 MB**。
+**完好性核对**：HEAD / 9 个提交 / 1364 个跟踪文件 / 工作区干净 / 与远程同步 —— **全部照旧**。
+**结论**：悬空对象删除**零影响**（不被任何 ref 引用）；真正不可恢复的只有"已删除分支/stash"的残骸，而实测本机**无 stash**。
+
+#### （4）★ 仓库治理原则（用户 2026-10-16 裁定，已写入 `.gitignore`）
+
+> 「**git 上最好还是用来保留项目，而不是测试数据**，哪怕 git 上没有一点证据留存，**只要功能一点没少就行**」
+
+落地：`.gitignore` 从 13 行加固到 60 行，新增忽略
+`1/carla/`（CARLA 本体 **18.5 GB**）· `1/api/output/`（运行产出 **13.3 GB**）· `1/uploads/` · `1/test_assets/` ·
+`*.db` / `*.pt` / `*.pth` / `*.onnx` / `*.ckpt` · 根目录 `_*/`（测试目录，**放行 `_tools/` 与 `_scripts/`**）· 根目录散落媒体 · 编辑器备份 `*.ck/*.c9/*.bak-*`；
+并把**已跟踪**的 `1/api/zhitong_violations.db`（**28.8 MB**）用 `git rm --cached` 移出索引（**本机文件保留**）。
+★ **本机文件一个都没删**（工作区仍 51.1 GB，功能零损失）。
+
+#### （5）其它登记
+
+- ★ **Trae 的 worktree**：`C:\Users\ROG\.trae-cn\worktrees\output\feat-empty-input-99G4ey`（分支指向 2026-06-10 的 `b2747f4`，相对 main 领先 0 个提交）。**属 Trae 资产，未动**（仅占 0.03 MB）。
+- 不属于本仓库的 `《供配电系统项目综合设计》工程日志_第3组.docx` 已按用户指示**移出**到 `C:\Users\ROG\Documents\供配电系统项目综合设计\`。
+- **纪律**：`E:\output` 是用户的 GitHub 仓库克隆 ⇒ **AI 不要自行 `git commit` / `git push`**（本轮是用户明确授权后才做的）。
+
