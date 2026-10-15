@@ -56,3 +56,8 @@ _*/
 *.orig
 *.tmp
 *.swp
+
+# 7) 已卸载插件的备份与一次性诊断产物（2026-10-16 追加，纯过程垃圾）
+dsh-workshop-backup/
+dsh-compaction-verify/
+dsh-workshop-src-recovered/
