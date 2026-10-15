@@ -1,0 +1,29 @@
+{
+  "task": "TASK-COORD-005",
+  "timestamp": "2026-09-25T23:55:00+08:00",
+  "status": "PASS",
+  "verdict": "ACCEPT",
+  "report": "e:/output/1/docs/REPORT_TASK-COORD-005_TRAE.md",
+  "details": {
+    "acceptance_criteria": {
+      "new_event_encoding_evidence_and_real_test": "PASS (save_event_video 转码 H.264，产物 fourcc=h264 实测)",
+      "at_least_one_event_plays_in_chromium": "PASS (evt_1790324866083_2_baecaf: readyState=4, error=null, currentTime 0→5.905s, 画面渲染真实交通场景)",
+      "seven_events_key_frames_not_placeholder": "PASS (DB 7/7 为 event-videos/ 相对路径, placeholder=False)",
+      "three_key_frames_http_200_and_displayed": "PASS (静态挂载 200 image/jpeg, 浏览器 3 张 960x432 naturalWidth>0)",
+      "original_fmp4_preserved": "PASS (7 个原始文件尺寸未变, 副本为 {event_id}_h264.mp4 新文件名)",
+      "tests_and_build_pass": "PASS (定向 18/18 OK, vite build 8.93s 成功)"
+    },
+    "code_changes": [
+      "api/circular_frame_buffer.py (+90): _get_ffmpeg_exe/_transcode_to_h264 + save_event_video 三段式(mp4v临时→H.264转码→失败回退mp4v)",
+      "api/realtime_detector.py (+54): _pick_key_frame_paths 真实 JPG 落盘返回 event-videos/ 相对路径 + 调用点传参",
+      "api/zhitong_violations.db: 7 事件 event_video_path/key_frames 更新",
+      "tests/test_event_media_contract.py (新增 9 用例)",
+      "tests/migrate_existing_events_f5.py (迁移脚本 ok=7 fail=0)",
+      "tests/smoke_f4_media_pipeline.py (冒烟 PASS)"
+    ],
+    "data_migration": {"events_migrated": 7, "h264_copies": 7, "keyframe_jpegs": 21, "originals_preserved": 7, "failures": 0},
+    "tests": {"focused_media_contract": "9/9 OK", "circular_buffer_plus_media": "18/18 OK", "full_discovery": "55 通过 + 1 既有收集错误(test_core 需 pytest, 非本任务引入)"},
+    "services": "前后端已停止, 8001/5173 端口释放确认 (REMAINING_LISTENERS=0)",
+    "environment_change": "安装 imageio-ffmpeg (清华镜像, 提供 libx264, 任务核心相关依赖); requirements.txt 未改动待指挥官批准固化"
+  }
+}

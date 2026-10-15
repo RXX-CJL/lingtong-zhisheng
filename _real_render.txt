@@ -1,0 +1,325 @@
+﻿使用质心追踪器
+ByteTrack 不可用，将使用质心追踪
+使用质心追踪器
+YOLO model loaded and moved to GPU: vehicle -> E:\output\1\zhitong\training\models\yolov8s.pt
+
+0: 576x1280 3 cars, 1 truck, 1 traffic light, 29.2ms
+Speed: 7.9ms preprocess, 29.2ms inference, 7.9ms postprocess per image at shape (1, 3, 576, 1280)
+YOLO model loaded and moved to GPU: traffic_light -> E:\output\1\zhitong\training\models\yolov8s.pt
+
+0: 576x1280 3 cars, 1 truck, 1 traffic light, 10.9ms
+Speed: 3.0ms preprocess, 10.9ms inference, 0.8ms postprocess per image at shape (1, 3, 576, 1280)
+YOLO model loaded and moved to GPU: helmet -> E:\output\1\zhitong\training\models\helmet_best.pt
+
+0: 576x1280 (no detections), 24.7ms
+Speed: 2.8ms preprocess, 24.7ms inference, 1.6ms postprocess per image at shape (1, 3, 576, 1280)
+YOLO model loaded and moved to GPU: lane -> E:\output\1\zhitong\training\models\lane.pt
+
+0: 576x1280 3 cars, 1 truck, 1 traffic light, 8.5ms
+Speed: 3.1ms preprocess, 8.5ms inference, 0.8ms postprocess per image at shape (1, 3, 576, 1280)
+YOLO model loaded and moved to GPU: yolov8s -> E:\output\1\zhitong\training\models\yolov8s.pt
+Using fallback model yolov8s for license_plate
+
+0: 576x1280 3 cars, 1 truck, 1 traffic light, 8.5ms
+Speed: 2.7ms preprocess, 8.5ms inference, 0.9ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 3 cars, 1 truck, 1 traffic light, 7.5ms
+Speed: 2.9ms preprocess, 7.5ms inference, 1.0ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 3 cars, 1 truck, 1 traffic light, 7.8ms
+Speed: 2.7ms preprocess, 7.8ms inference, 1.3ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 (no detections), 5.6ms
+Speed: 3.9ms preprocess, 5.6ms inference, 0.6ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 3 cars, 1 truck, 1 traffic light, 7.7ms
+Speed: 3.6ms preprocess, 7.7ms inference, 1.0ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 3 cars, 1 truck, 1 traffic light, 8.1ms
+Speed: 2.6ms preprocess, 8.1ms inference, 1.3ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 truck, 3 traffic lights, 7.3ms
+Speed: 2.7ms preprocess, 7.3ms inference, 1.1ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 truck, 3 traffic lights, 15.4ms
+Speed: 3.0ms preprocess, 15.4ms inference, 1.2ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 (no detections), 5.0ms
+Speed: 2.7ms preprocess, 5.0ms inference, 0.7ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 truck, 3 traffic lights, 16.1ms
+Speed: 3.3ms preprocess, 16.1ms inference, 2.9ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 truck, 3 traffic lights, 11.5ms
+Speed: 2.8ms preprocess, 11.5ms inference, 1.8ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 truck, 3 traffic lights, 15.9ms
+Speed: 2.9ms preprocess, 15.9ms inference, 3.2ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 truck, 3 traffic lights, 17.1ms
+Speed: 2.8ms preprocess, 17.1ms inference, 2.6ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 (no detections), 4.1ms
+Speed: 2.7ms preprocess, 4.1ms inference, 0.5ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 truck, 3 traffic lights, 7.5ms
+Speed: 4.3ms preprocess, 7.5ms inference, 2.3ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 truck, 3 traffic lights, 7.9ms
+Speed: 3.7ms preprocess, 7.9ms inference, 1.6ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 truck, 3 traffic lights, 8.2ms
+Speed: 3.6ms preprocess, 8.2ms inference, 1.2ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 truck, 3 traffic lights, 8.1ms
+Speed: 3.6ms preprocess, 8.1ms inference, 1.2ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 (no detections), 5.1ms
+Speed: 3.6ms preprocess, 5.1ms inference, 0.9ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 truck, 3 traffic lights, 8.1ms
+Speed: 3.4ms preprocess, 8.1ms inference, 1.5ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 truck, 3 traffic lights, 8.1ms
+Speed: 2.9ms preprocess, 8.1ms inference, 1.3ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 truck, 3 traffic lights, 9.1ms
+Speed: 3.4ms preprocess, 9.1ms inference, 1.3ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 truck, 3 traffic lights, 8.2ms
+Speed: 2.9ms preprocess, 8.2ms inference, 1.2ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 (no detections), 6.6ms
+Speed: 3.0ms preprocess, 6.6ms inference, 0.6ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 truck, 3 traffic lights, 8.1ms
+Speed: 3.3ms preprocess, 8.1ms inference, 1.3ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 truck, 3 traffic lights, 13.1ms
+Speed: 3.8ms preprocess, 13.1ms inference, 2.1ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 10.5ms
+Speed: 5.0ms preprocess, 10.5ms inference, 1.5ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 18.6ms
+Speed: 3.9ms preprocess, 18.6ms inference, 1.7ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 (no detections), 8.9ms
+Speed: 4.0ms preprocess, 8.9ms inference, 1.3ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 11.0ms
+Speed: 3.5ms preprocess, 11.0ms inference, 1.9ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 17.6ms
+Speed: 3.9ms preprocess, 17.6ms inference, 1.5ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 9.4ms
+Speed: 3.2ms preprocess, 9.4ms inference, 1.2ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 8.0ms
+Speed: 3.4ms preprocess, 8.0ms inference, 1.3ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 (no detections), 4.9ms
+Speed: 3.3ms preprocess, 4.9ms inference, 0.6ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 7.6ms
+Speed: 3.3ms preprocess, 7.6ms inference, 1.5ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 7.9ms
+Speed: 3.4ms preprocess, 7.9ms inference, 1.2ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 7.6ms
+Speed: 3.4ms preprocess, 7.6ms inference, 1.2ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 7.6ms
+Speed: 2.9ms preprocess, 7.6ms inference, 1.3ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 (no detections), 4.3ms
+Speed: 2.4ms preprocess, 4.3ms inference, 0.7ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 7.6ms
+Speed: 2.7ms preprocess, 7.6ms inference, 1.0ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 7.7ms
+Speed: 2.6ms preprocess, 7.7ms inference, 1.1ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 7.5ms
+Speed: 2.5ms preprocess, 7.5ms inference, 1.3ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 12.8ms
+Speed: 2.6ms preprocess, 12.8ms inference, 1.4ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 (no detections), 5.3ms
+Speed: 2.6ms preprocess, 5.3ms inference, 0.5ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 9.6ms
+Speed: 2.5ms preprocess, 9.6ms inference, 1.3ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 15.9ms
+Speed: 3.0ms preprocess, 15.9ms inference, 2.0ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 12.3ms
+Speed: 2.7ms preprocess, 12.3ms inference, 1.4ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 18.2ms
+Speed: 2.9ms preprocess, 18.2ms inference, 1.2ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 (no detections), 9.0ms
+Speed: 4.1ms preprocess, 9.0ms inference, 1.3ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 9.0ms
+Speed: 4.0ms preprocess, 9.0ms inference, 1.1ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 7.6ms
+Speed: 2.7ms preprocess, 7.6ms inference, 1.8ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 7.7ms
+Speed: 2.6ms preprocess, 7.7ms inference, 0.9ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 7.9ms
+Speed: 2.5ms preprocess, 7.9ms inference, 1.2ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 (no detections), 5.1ms
+Speed: 3.0ms preprocess, 5.1ms inference, 0.5ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 7.8ms
+Speed: 2.6ms preprocess, 7.8ms inference, 1.1ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 7.2ms
+Speed: 2.6ms preprocess, 7.2ms inference, 1.4ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 7.3ms
+Speed: 2.6ms preprocess, 7.3ms inference, 1.2ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 7.8ms
+Speed: 2.5ms preprocess, 7.8ms inference, 1.0ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 (no detections), 4.0ms
+Speed: 2.5ms preprocess, 4.0ms inference, 0.5ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 7.5ms
+Speed: 3.2ms preprocess, 7.5ms inference, 1.2ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 2 cars, 1 truck, 2 traffic lights, 7.8ms
+Speed: 2.6ms preprocess, 7.8ms inference, 1.4ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 3 cars, 1 truck, 2 traffic lights, 8.1ms
+Speed: 2.7ms preprocess, 8.1ms inference, 1.4ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 3 cars, 1 truck, 2 traffic lights, 14.0ms
+Speed: 2.6ms preprocess, 14.0ms inference, 1.6ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 (no detections), 5.4ms
+Speed: 2.7ms preprocess, 5.4ms inference, 0.8ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 3 cars, 1 truck, 2 traffic lights, 18.1ms
+Speed: 3.5ms preprocess, 18.1ms inference, 2.0ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 3 cars, 1 truck, 2 traffic lights, 11.4ms
+Speed: 3.2ms preprocess, 11.4ms inference, 1.1ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 3 cars, 1 truck, 2 traffic lights, 16.6ms
+Speed: 2.9ms preprocess, 16.6ms inference, 2.7ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 3 cars, 1 truck, 2 traffic lights, 17.0ms
+Speed: 2.7ms preprocess, 17.0ms inference, 2.9ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 (no detections), 4.0ms
+Speed: 2.7ms preprocess, 4.0ms inference, 0.5ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 3 cars, 1 truck, 2 traffic lights, 7.6ms
+Speed: 2.9ms preprocess, 7.6ms inference, 1.2ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 3 cars, 1 truck, 2 traffic lights, 7.8ms
+Speed: 2.6ms preprocess, 7.8ms inference, 0.9ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 truck, 3 traffic lights, 7.8ms
+Speed: 2.6ms preprocess, 7.8ms inference, 0.9ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 truck, 3 traffic lights, 7.8ms
+Speed: 2.6ms preprocess, 7.8ms inference, 1.0ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 (no detections), 4.1ms
+Speed: 2.5ms preprocess, 4.1ms inference, 0.4ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 truck, 3 traffic lights, 7.8ms
+Speed: 2.7ms preprocess, 7.8ms inference, 0.9ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 truck, 3 traffic lights, 7.3ms
+Speed: 2.6ms preprocess, 7.3ms inference, 1.1ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 car, 1 truck, 3 traffic lights, 7.6ms
+Speed: 2.7ms preprocess, 7.6ms inference, 1.3ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 car, 1 truck, 3 traffic lights, 7.9ms
+Speed: 2.7ms preprocess, 7.9ms inference, 0.9ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 (no detections), 4.8ms
+Speed: 2.9ms preprocess, 4.8ms inference, 0.5ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 car, 1 truck, 3 traffic lights, 8.1ms
+Speed: 2.7ms preprocess, 8.1ms inference, 1.0ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 car, 1 truck, 3 traffic lights, 7.6ms
+Speed: 2.7ms preprocess, 7.6ms inference, 1.6ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 car, 1 truck, 3 traffic lights, 11.7ms
+Speed: 2.8ms preprocess, 11.7ms inference, 1.5ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 car, 1 truck, 3 traffic lights, 12.7ms
+Speed: 2.7ms preprocess, 12.7ms inference, 1.2ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 (no detections), 8.3ms
+Speed: 3.2ms preprocess, 8.3ms inference, 1.0ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 car, 1 truck, 3 traffic lights, 8.8ms
+Speed: 2.6ms preprocess, 8.8ms inference, 1.1ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 car, 1 truck, 3 traffic lights, 12.3ms
+Speed: 3.1ms preprocess, 12.3ms inference, 1.4ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 car, 1 truck, 3 traffic lights, 15.7ms
+Speed: 2.7ms preprocess, 15.7ms inference, 1.6ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 car, 1 truck, 3 traffic lights, 19.4ms
+Speed: 2.8ms preprocess, 19.4ms inference, 3.0ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 (no detections), 4.1ms
+Speed: 3.2ms preprocess, 4.1ms inference, 0.5ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 car, 1 truck, 3 traffic lights, 7.3ms
+Speed: 3.0ms preprocess, 7.3ms inference, 1.2ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 car, 1 truck, 3 traffic lights, 8.2ms
+Speed: 2.7ms preprocess, 8.2ms inference, 1.9ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 car, 1 truck, 3 traffic lights, 7.9ms
+Speed: 2.8ms preprocess, 7.9ms inference, 1.5ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 car, 1 truck, 3 traffic lights, 7.7ms
+Speed: 3.8ms preprocess, 7.7ms inference, 1.2ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 (no detections), 4.5ms
+Speed: 2.8ms preprocess, 4.5ms inference, 0.5ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 car, 1 truck, 3 traffic lights, 7.9ms
+Speed: 2.6ms preprocess, 7.9ms inference, 1.0ms postprocess per image at shape (1, 3, 576, 1280)
+
+0: 576x1280 1 car, 1 truck, 3 traffic lights, 8.0ms
+Speed: 2.6ms preprocess, 8.0ms inference, 1.3ms postprocess per image at shape (1, 3, 576, 1280)
+取到帧序号 59，尺寸 (576, 1280, 3)
+最终检测框数: 7
+追踪车辆数: 1
+
+==============================================================================
+真实追踪车辆（含轨迹与方向）
+==============================================================================
+  ID  1 car        bbox=[522, 226, 577, 276] hist=20 speed=137.75px/s dir=down        vec=(-1.0, -0.0)
+
+==============================================================================
+真实违规判定
+==============================================================================
+  违规数: 0
+
+真实渲染输出: E:\output\_screens\real_detection.png
+渲染耗时: 3.6ms

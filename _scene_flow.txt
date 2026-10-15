@@ -1,0 +1,40 @@
+﻿==========================================================================
+python.exe : Traceback (most recent call last):
+所在位置 行:2 字符: 1
++ & $gpu 'E:\output\_scripts\_test_scene_flow.py' 2>&1 | Out-File 'E:\o ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "E:\output\_scripts\_test_scene_flow.py", line 103, in <module>
+1) AI �Զ��������ߣ�����Ƶ��֡��
+==========================================================================
+  HTTP 200
+  ��⵽�����ߺ�ѡ: 1 ��
+    #0: [[57, 259], [1280, 259], [1280, 562], [57, 562]]
+  ֹͣ�߽��� y: None
+
+==========================================================================
+2) �����ע��ģ���˹�ȷ�ϣ������� + ֹͣ�� + ��ͣ����
+==========================================================================
+  HTTP 200  key=ea1ca6cbb27653af24ebe585d56f0ffd_7bc8e08680df
+  �ѱ����ֶ�: ['crosswalk_zones', 'lane_lines', 'stop_line_y', 'no_parking_zones', 'road_direction', 'pixel_per_meter', 'annotated_by', 'annotated_at']
+  annotated_by=manual  at=2026-10-03 02:27:33
+
+==========================================================================
+3) ������֤
+==========================================================================
+  HTTP 200  exists=True
+  ������: 1 ��
+  ֹͣ��: 370   ��ͣ��: 1 ��
+  ������: 1 ��
+
+==========================================================================
+4) ������ -> ��֤��ע���Զ�����
+==========================================================================
+  ���: HTTP 200
+  running=True processed=28
+
+  �����־�еı�ע���ؼ�¼:
+    print("   " + l[:160])
+UnicodeEncodeError: 'gbk' codec can't encode character '\ufffd' in position 54: illegal multibyte sequence

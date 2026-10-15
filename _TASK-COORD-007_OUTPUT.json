@@ -1,0 +1,43 @@
+{
+  "task": "TASK-COORD-007",
+  "timestamp": "2026-09-25T23:00:17+08:00",
+  "status": "PASS",
+  "verdict": "ACCEPT",
+  "details": {
+    "summary": "实现真实逐帧检测框分析回放：sidecar JSON 随事件视频落盘、replay 接口下发、EventDetail SVG 叠加真实 bbox/track_id 并联动车辆列表，旧事件诚实降级",
+    "modified_files": [
+      "api/circular_frame_buffer.py",
+      "api/realtime_detector.py",
+      "api/routers/realtime.py",
+      "web-admin/src/api/index.js",
+      "web-admin/src/views/EventDetail.vue",
+      "tests/test_replay_sidecar_contract.py (新增)",
+      "tests/verify_replay_sidecar.py (新增)",
+      "tests/test_event_media_contract.py (test_04 两代事件约定最小修正)"
+    ],
+    "new_events_with_sidecar": [
+      "evt_1790347063112_79_64e07b",
+      "evt_1790347063112_80_32d423",
+      "evt_1790347061580_75_613c3b"
+    ],
+    "sidecar_path_rule": "{event_video_path}.replay.json",
+    "replay_endpoint": {
+      "new_event": "GET /api/realtime/events/evt_1790347063112_79_64e07b/replay -> 200, frames=299, fps=10, source=local_yolo_tracker",
+      "old_event": "GET /api/realtime/events/evt_1790324873606_20_4ff131/replay -> 200, success=false, code=no_frame_replay_data"
+    },
+    "browser_verification": "9/9 PASS（SVG叠加/ID一致/随帧更新167->218/点击联动/原始证据无叠加/旧事件降级文案）",
+    "screenshots": [
+      "C:\\Users\\ROG\\AppData\\Local\\Temp\\trae\\screenshots\\t7_new_analysis.png",
+      "C:\\Users\\ROG\\AppData\\Local\\Temp\\trae\\screenshots\\t7_frame_update.png",
+      "C:\\Users\\ROG\\AppData\\Local\\Temp\\trae\\screenshots\\t7_linkage.png",
+      "C:\\Users\\ROG\\AppData\\Local\\Temp\\trae\\screenshots\\t7_old_degraded.png"
+    ],
+    "tests": "replay_sidecar_contract 7/7 OK; event_media_contract 9/9 OK",
+    "build": "vite build 成功 (9.42s)",
+    "git": "HEAD 4a67b5a 未变，无 commit，无破坏性操作，未清理他人未提交改动",
+    "services": "验证完成后 8001/5173 已停止并确认端口释放",
+    "verify_script": "tests/verify_replay_sidecar.py -> RESULT: PASS",
+    "model_info": "GLM-5.3-Flash（环境声明，子代理无法从服务端进一步核实）"
+  },
+  "report": "e:\\output\\1\\docs\\REPORT_TASK-COORD-007_TRAE.md"
+}

@@ -1,0 +1,29 @@
+﻿������...
+{'success': True, 'message': '��������'}
+
+==========================================================================
+׷�ٳ����ֶΣ�ǰ 3 ����
+==========================================================================
+  ������: 10
+  {"id": "1", "track_id": "1", "class_name": "car", "confidence": "0.8795682787895203", "bbox": "list", "center": "list", "history": "list", "direction": "stationary", "speed": "0.05580433294959659", "is_wrong_way": "False", "first_seen": "1790957245.1835601", "last_seen": "1790957334.7823374", "frame_count": "10"}
+  {"id": "2", "track_id": "2", "class_name": "car", "confidence": "0.861182451248169", "bbox": "list", "center": "list", "history": "list", "direction": "stationary", "speed": "0.022321733179838633", "is_wrong_way": "False", "first_seen": "1790957245.1835601", "last_seen": "1790957334.7823374", "frame_count": "10"}
+  {"id": "5", "track_id": "5", "class_name": "car", "confidence": "0.8465422987937927", "bbox": "list", "center": "list", "history": "list", "direction": "stationary", "speed": "0.06505029756835926", "is_wrong_way": "False", "first_seen": "1790957245.1835601", "last_seen": "1790957334.7823374", "frame_count": "10"}
+
+==========================================================================
+���¼�������Υ�����ṹ
+==========================================================================
+  ���ض����ֶ�: ['success', 'detections', 'violations', 'violation_detected', 'confidence', 'frame_count', 'processed_count', 'violation_count', 'annotated_frame', 'tracked_vehicles', 'behaviors', 'tracked_vehicle_count', 'avg_fps', 'pending_count', 'confirmed_count']
+
+  --- detections: 13 ������ֶ� ---
+      {"class_name": "car", "class_name_cn": "�γ�", "confidence": "0.877065122127533", "bbox": "list", "source_model": "vehicle", "source_model_name": "�߾��ȳ������"}
+
+  --- violations: 5 ������ֶ� ---
+      {"violation_type": "wrong_way", "violation_type_cn": "����", "confidence": "0.7455", "is_violation": "True", "evidence": "dict", "location": "dict", "timestamp": "2026-10-03T00:09:01.563951", "message": "��⵽ 1 �����г���"}
+
+  --- behaviors: 4 ������ֶ� ---
+      {"behavior_type": "illegal_parking", "behavior_type_cn": "Υ��ͣ��", "confidence": "0.7", "is_violation": "True", "evidence": "dict", "vehicle_id": "1", "timestamp": "2026-10-03T00:09:01.563951"}
+
+  --- tracked_vehicles: 12 ������ֶ� ---
+      {"id": "1", "track_id": "1", "class_name": "car", "confidence": "0.877065122127533", "bbox": "list", "center": "list", "history": "list", "direction": "stationary", "speed": "0.06225398221652567", "is_wrong_way": "False", "first_seen": "1790957245.1835601", "last_seen": "1790957341.5629368", "frame_count": "11"}
+
+{'success': True, 'message': '�����ֹͣ'}

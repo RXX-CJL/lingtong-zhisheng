@@ -1,9 +1,9 @@
 # 智瞳灵声项目交接报告（给下一任 AI 执行者）
 
 > **生成日期**: 2026-08-21
-> **最后更新**: 2026-09-05
+> **最后更新**: 2026-09-27
 > **项目根目录**: `e:\output\1`
-> **交接状态**: 核心代码全部完成，存在 B1/B2 参数错位 bug 待修复 + 12 处明文密钥待清理
+> **交接状态**: 核心代码全部完成；**B1/B2 已复核确认修复（2026-09-27）**；当前唯一 P0 = 12 处明文密钥待清理（B3）+ 根目录缺 .gitignore（B4）
 
 ---
 
@@ -277,20 +277,24 @@ DETECTING → TRIGGERED → RECORDING → PENDING_AI → AI_REVIEWED → CONFIRM
 
 | 编号 | 问题 | 位置 | 影响 |
 |------|------|------|------|
-| **B1** | `analyze_with_claude` 3参调用2参函数 | cloud_collaborator.py:784 | 事件云端AI分析静默降级，永远拿不到真实结果 |
-| **B2** | `analyze_with_deepseek_judge` 入参语义错位 | cloud_collaborator.py:804 | 同上，DeepSeek 二级验证失效 |
+| ~~**B1**~~ | ~~`analyze_with_claude` 3参调用2参函数~~ **✅ 已修复（2026-09-27 复核）** | cloud_collaborator.py:784 | ~~事件云端AI分析静默降级~~ 现为 3 参对齐，返回真实结果 |
+| ~~**B2**~~ | ~~`analyze_with_deepseek_judge` 入参语义错位~~ **✅ 已修复（2026-09-27 复核）** | cloud_collaborator.py:823 | ~~DeepSeek 二级验证失效~~ 现为结构化 dict 对齐 |
 | **B3** | 12处明文API密钥硬编码 | image_recognizer.py:206, config_runtime.json, zhitong/, beforeness/ | 安全红线，必须移到环境变量 |
 | **B4** | 根目录无 .gitignore | e:\output\1\ | 密钥和大文件可能被提交 |
 
 > **B1/B2 说明**：两处调用都被 try/except 包裹，不会崩溃，而是静默返回空结果。修复方式是对齐参数，不是删除异常处理。
+>
+> **✅ B1/B2 已修复（2026-09-27 由 DSH 复核确认）**：`cloud_collaborator.py:784` 与 `:823` 均已按真实签名对齐；`try/except` 优雅降级按原要求保留（B1 记 `logger.warning`、B2 记 `logger.error`）。
+> 证据：`E:\output\_TASK-COORD-002-DSH_OUTPUT.json`；校验脚本 `E:\output\_b12_verify.py`（零安装、不联网）→ **PASS 17 / FAIL 0，exit=0**。
+> 方法：`autospec=True` mock 强制校验"调用点实参 ↔ 真实签名"，两处 mock 均被真实调用且返回 `success=True`（三级证据）。
 
 ### 5.2 P0 待办
 
-| # | 事项 | 输出证明 |
-|---|------|---------|
-| 1 | 修复 B1/B2 参数错位 + mock 单测 | OUTPUT 文件 |
-| 2 | 清除 12 处明文密钥 + .gitignore + .env.example | OUTPUT 文件 |
-| 3 | 端到端最小闭环跑通：触发事件 → event_videos/ 产出 .mp4 + 前端可见 | 截图 |
+| # | 事项 | 输出证明 | 状态 |
+|---|------|---------|------|
+| 1 | 修复 B1/B2 参数错位 + mock 单测 | OUTPUT 文件 | ✅ **已完成**（代码早已修复，2026-09-27 复核确认；见 `_TASK-COORD-002-DSH_OUTPUT.json`） |
+| 2 | 清除 12 处明文密钥 + .gitignore + .env.example | OUTPUT 文件 | 🔴 **待做（当前唯一 P0）** |
+| 3 | 端到端最小闭环跑通：触发事件 → event_videos/ 产出 .mp4 + 前端可见 | 截图 | 🔴 待做 |
 
 ### 5.3 P1 待办
 
@@ -443,17 +447,26 @@ cd e:\output\1 ; py -3 -m pytest tests/ -v
 | 2026-09-05 | — | 摄像头互斥锁+日志系统 | PASS | camera_mutex.js + logger.js + SystemLog.vue |
 | 2026-09-05 | — | 文件夹清理 | PASS | 97文件+6目录 |
 | 2026-09-05 | — | 交接文件优化 | PASS | 更新至 2026-09-05 状态 |
+| 2026-09-27 | TASK-COORD-002-DSH | B1/B2 参数错位复核 | **PASS** | 复核确认代码早已修复；新增零安装校验脚本 `_b12_verify.py`（PASS 17/FAIL 0）；更正交接报告与审计报告的滞后状态 |
+
+**TASK-COORD-002-DSH 补充（规则 2/3 必填）**
+
+| 列 | 内容 |
+|---|---|
+| 修改的文件 | `e:\output\PROJECT_HANDOVER_REPORT.md`、`e:\output\1\PROJECT_AUDIT_AND_BASELINE_REPORT.md`（仅状态更正）；**项目代码零改动** |
+| 执行者补充 | ① 本任务开局被旧文档误导——交接报告与审计报告都写 B1/B2 未修复，实际 `cloud_collaborator.py:784/823` 早已按真实签名对齐，且 `docs\REPORT_TASK-COORD-001_DSH.md:344` 已记录过修复。**建议：任何"待修复"项动手前先读代码复核，否则会重复劳动。** ② 项目 `tests/test_cloud_collaborator_event.py` 依赖 pytest，但 `py -3` 与 `.venv` 均未安装 pytest；本次改用零安装的 `unittest.mock` 等价校验。**建议把 pytest 写入 `api/requirements.txt`。** ③ 复核中发现真正未完成的 P0 其实是 B3（12 处明文密钥）与 B4（缺 .gitignore）。 |
+| 证据等级 | 三级（autospec mock 被真实调用并返回 success=True）+ 二级（签名/实参/降级分支源码核对）+ 一级（`PASS 17 / FAIL 0, exit=0`） |
 
 ---
 
 ## 十三、给新任执行者的建议顺序
 
-1. **[P0] 修复 B1/B2 参数错位** — 对齐 analyze_with_claude 和 analyze_with_deepseek_judge 的调用参数
-2. **[P0] 清除 12 处明文密钥** — 移到 .env，建 .gitignore
-3. **[P0] 端到端事件闭环跑通** — 触发事件，确认 event_videos/ 产出 .mp4
+1. **[~~P0~~ ✅ 已完成] 修复 B1/B2 参数错位** — 2026-09-27 复核确认代码早已修复（调用参数已对齐 `analyze_with_claude` / `analyze_with_deepseek_judge` 真实签名），优雅降级按要求保留。见 `_TASK-COORD-002-DSH_OUTPUT.json`
+2. **[P0 · 当前唯一]** 清除 12 处明文密钥 — 移到 .env，建 .gitignore（B3 + B4）
+3. **[P0]** 端到端事件闭环跑通 — 触发事件，确认 event_videos/ 产出 .mp4
 4. **[P1] 真实指标实测** — 延迟/FPS/mAP，写入 docs/REAL_METRICS.md
 5. **[P1] 方案书对齐** — 删除未实现卖点
 
 ---
 
-*交接报告最后更新：2026-09-05。新任执行者建议通读第 4-7 章 + 第 9-11 章。遇到问题先查 _TASK_HISTORY.json。*
+*交接报告最后更新：2026-09-27（TASK-COORD-002-DSH：B1/B2 复核）。新任执行者建议通读第 4-7 章 + 第 9-11 章。遇到问题先查 _TASK_HISTORY.json。*

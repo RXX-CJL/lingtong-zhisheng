@@ -1,0 +1,60 @@
+{
+  "task_id": "TASK-COORD-002-DSH",
+  "title": "核实 B1/B2 参数错位缺陷状态（结论：代码已修复，文档滞后）",
+  "date": "2026-09-27",
+  "executor": "DSH Desktop (deepseek-flash / reasoningEffort=high)",
+  "status": "PASS",
+  "type": "F 验证测试 / G 故障排查",
+  "conclusion": "B1/B2 在代码层面已修复并通过对齐校验；待修复的是文档（交接报告与审计报告仍标记为未修复），不是代码。",
+  "code_under_test": [
+    "e:\\output\\1\\api\\cloud_collaborator.py:784",
+    "e:\\output\\1\\api\\cloud_collaborator.py:805-827",
+    "e:\\output\\1\\api\\image_recognizer.py:1263",
+    "e:\\output\\1\\api\\image_recognizer.py:1718"
+  ],
+  "evidence": {
+    "level": "三级（真实行为）+ 二级（文件/配置状态）+ 一级（命令结果）",
+    "level1_command": "E:\\output\\1\\.venv\\Scripts\\python.exe E:\\output\\_b12_verify.py  ->  PASS 17 / FAIL 0, exit=0",
+    "level2_source_facts": [
+      "analyze_with_claude(image_input, violation_type, context_prompt='')  —— 3 参",
+      "analyze_with_deepseek_judge(violation_type, yolo_result_dict, doubao_result_dict)  —— 3 参",
+      "B1 调用点 cloud_collaborator.py:784 -> analyze_with_claude(frame_b64, event_type, context_prompt)  —— 实参 3 个",
+      "B2 调用点 cloud_collaborator.py:823 -> analyze_with_deepseek_judge(event_type, yolo_result_dict, primary_result)  —— 实参 3 个"
+    ],
+    "level2_code_markers": [
+      "cloud_collaborator.py:806 注释：'修复 B2：此前误传 str 导致 AttributeError 被降级吞掉'"
+    ],
+    "level3_real_behavior": [
+      "autospec=True 的 mock 被真实调用（此前参数错位时不可能走到）",
+      "B1 实参 = (JPEG base64, 'illegal_parking', 'ctx')",
+      "B2 实参 = ('illegal_parking', {'success':True,'detections':[{'class_name':'car','confidence':0.8}],'message':...}, {主视觉结果 dict})",
+      "两处均返回真实结果 success=True，未走静默降级分支",
+      "优雅降级保留：B1 try/except + return {} + logger.warning；B2 try/except + _empty_ai_result + logger.error"
+    ]
+  },
+  "doc_drift_found": [
+    "e:\\output\\PROJECT_HANDOVER_REPORT.md:6 —— 交接状态仍写“存在 B1/B2 参数错位 bug 待修复”",
+    "e:\\output\\PROJECT_HANDOVER_REPORT.md:280-281 —— 已知坑表仍列 B1/B2",
+    "e:\\output\\PROJECT_HANDOVER_REPORT.md:291 —— 待办仍列“修复 B1/B2 参数错位 + mock 单测”",
+    "e:\\output\\1\\PROJECT_AUDIT_AND_BASELINE_REPORT.md:321 —— P1-6 仍列未修复",
+    "已确认修复的旁证：e:\\output\\1\\docs\\REPORT_TASK-COORD-001_DSH.md:344 与 :596（该报告已指出文档滞后）"
+  ],
+  "files_created": [
+    "e:\\output\\_b12_verify.py",
+    "e:\\output\\_TASK-COORD-002-DSH_OUTPUT.json"
+  ],
+  "files_modified": [],
+  "not_done": [
+    "未修改任何项目代码（因为代码无需修改）",
+    "未更新交接报告与审计报告——按协议第 6 节，修改项目文档需用户确认"
+  ],
+  "risks": [
+    "若不修文档，下一任 AI 会重复排查同一个已修复的缺陷（本任务的初始判断正是被旧文档误导）"
+  ],
+  "next_suggestions": [
+    "更新 PROJECT_HANDOVER_REPORT.md：交接状态、已知坑表、待办清单、任务执行记录表（执行者补充必填）",
+    "更新 PROJECT_AUDIT_AND_BASELINE_REPORT.md:321 的 P1-6 状态",
+    "剩余真正的 P0：12 处明文密钥待清理（beforeness\\ 旧原型）"
+  ],
+  "test_note": "项目 tests/test_cloud_collaborator_event.py 使用 pytest，但 py -3 与 .venv 均未安装 pytest；本任务改用零安装的 unittest.mock 等价校验（不联网、不改环境）。"
+}

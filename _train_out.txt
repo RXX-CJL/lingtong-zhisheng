@@ -1,0 +1,18 @@
+﻿==========================================================================
+��������: 117  green=48  red=54  yellow=15
+�豸: cuda   ����: 64x64   ����: 80
+==========================================================================
+ѵ�� 93  ��֤ 24
+  epoch   1  loss=0.6099  val_acc=0.458  best=0.458
+  epoch  10  loss=0.0459  val_acc=0.958  best=0.958
+  epoch  20  loss=0.1487  val_acc=0.917  best=1.000
+  epoch  30  loss=0.0066  val_acc=0.958  best=1.000
+  epoch  40  loss=0.0010  val_acc=1.000  best=1.000
+  epoch  50  loss=0.0012  val_acc=0.958  best=1.000
+  epoch  60  loss=0.0015  val_acc=0.958  best=1.000
+  epoch  70  loss=0.0004  val_acc=0.958  best=1.000
+  epoch  80  loss=0.0037  val_acc=0.958  best=1.000
+
+ѵ����ɣ���ʱ 9.9s   �����֤׼ȷ�� 1.000
+Ȩ���ѱ���: E:\output\_tl_color_cls\tl_color_cnn.pt  (2219 KB)
+��֤����ϸ: E:\output\_tl_color_cls\val_predictions.csv

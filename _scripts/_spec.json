@@ -1,0 +1,23 @@
+{
+  "carla_version": "0.9.16",
+  "server_version": "0.9.16",
+  "map": "Carla/Maps/Town10HD_Opt",
+  "synchronous_mode": false,
+  "fixed_delta_seconds": null,
+  "spectator": {
+    "location": {
+      "x": -19.719799041748047,
+      "y": -63.145442962646484,
+      "z": 5.73164176940918
+    },
+    "rotation": {
+      "pitch": -20.32539939880371,
+      "yaw": -179.7740936279297,
+      "roll": 0.00013288500485941768
+    },
+    "fov_attr": null
+  },
+  "actors_total": 23,
+  "vehicles": 0,
+  "traffic_lights": 15
+}

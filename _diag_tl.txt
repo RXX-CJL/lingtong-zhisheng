@@ -1,0 +1,36 @@
+﻿============================================================================
+检测模型: E:\output\_models_dl\traffic_light_detection_trained_weights\train5\weights\best.pt
+============================================================================
+  torch.load 失败: ModuleNotFoundError: No module named 'ultralytics.yolo'
+
+============================================================================
+分类模型: E:\output\_models_dl\traffic_light_color_detection_trained_weights\runs\detect\train2\weights\best.pt
+============================================================================
+  torch.load 失败: ModuleNotFoundError: No module named 'ultralytics.yolo'
+
+============================================================================
+用 task 参数显式加载并测试
+============================================================================
+--- 分类模型 (task='classify') ---
+  names: {0: 'green', 1: 'red', 2: 'yellow'}
+    裁剪#1 28x64 imgsz=64: None (0.000)
+    裁剪#1 28x64 imgsz=128: None (0.000)
+    裁剪#1 28x64 imgsz=224: None (0.000)
+    裁剪#2 34x67 imgsz=64: None (0.000)
+    裁剪#2 34x67 imgsz=128: None (0.000)
+    裁剪#2 34x67 imgsz=224: None (0.000)
+    裁剪#3 31x44 imgsz=64: None (0.000)
+    裁剪#3 31x44 imgsz=128: None (0.000)
+    裁剪#3 31x44 imgsz=224: None (0.000)
+    裁剪#4 20x40 imgsz=64: None (0.000)
+    裁剪#4 20x40 imgsz=128: None (0.000)
+    裁剪#4 20x40 imgsz=224: None (0.000)
+
+--- 检测模型：不同 imgsz/conf ---
+  names: {0: 'traffic_light'}  task=detect
+    imgsz=640 conf=0.1: 检出 2
+    imgsz=640 conf=0.25: 检出 0
+    imgsz=960 conf=0.1: 检出 4
+    imgsz=960 conf=0.25: 检出 2
+    imgsz=1280 conf=0.1: 检出 2
+    imgsz=1280 conf=0.25: 检出 0

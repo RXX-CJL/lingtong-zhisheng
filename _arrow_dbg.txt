@@ -1,0 +1,27 @@
+﻿��ͼ: (576, 1280, 3)
+  ��������: (-0.0, -1.0)
+  ��Ⱦ��仯����: 4372
+  �仯����: x 197-318  y 271-421
+  �ֹ���ͷ�仯����: 441
+  ���: arrow_debug.png / arrow_manual.png
+
+  render �м�ͷ�����Ƿ������Դ��: True
+  ---- ��ͷ����� ----
+·�涨����scene_config['road_direction']����һ�¼�Ϊ���С�
+            # �������� bbox �����ط�����������ͷ������ʱ�ú�ɫ���Ӵ֣�ͻ���澯����
+            try:
+                cx = float((x1 + x2) / 2.0)
+                cy = float((y1 + y2) / 2.0)
+                vec = _direction_vector(veh, tracked_history=None)
+                if vec is not None:
+                    dx, dy = vec
+                    L = max(18.0, min(60.0, (x2 - x1) * 0.45))
+                    ex, ey = cx + dx * L, cy + dy * L
+                    arrow_color = COLOR_VIOLATION if (is_violation or veh.get("is_wrong_way")) \
+                        else COLOR_ARROW
+                    thick = 3 if (is_violation or veh.get("is_wrong_way")) else 2
+                    cv2.arrowedLine(frame, (int(cx), int(cy)), (int(ex), int(ey)),
+                                    arrow_color, thick, tipLength=0.32)
+            except Exception:
+                pass
+            # ----

@@ -1,0 +1,46 @@
+{
+  "task": "TASK-COORD-006B",
+  "timestamp": "2026-09-26T02:30:00+08:00",
+  "status": "PASS",
+  "details": {
+    "summary": "EventDetail 新增原始证据/分析回放模式切换、事件级中文叠加徽标（含逐帧数据未采集提示）、右栏置顶可点击中文车辆信息面板（选中高亮联动）、AI 判定与人工复核状态独立分区；全程仅使用真实事件级数据，未伪造逐帧框/速度/车牌/AI 结论。",
+    "files_modified": [
+      "web-admin/src/views/EventDetail.vue"
+    ],
+    "files_created": [
+      "docs/REPORT_TASK-COORD-006B_TRAE.md"
+    ],
+    "chinese_field_mapping": {
+      "vehicle_class": "CLASS_CN 内联映射（car→轿车 等 7 类）",
+      "violation_type": "utils/format.js TYPE_MAP 优先 + 内联 EXTRA_TYPE_CN 兜底",
+      "direction": "DIRECTION_CN 内联映射（right→向右 等 5 向）",
+      "plate": "空值→未识别",
+      "state": "沿用既有 stateLabelMap 8 态",
+      "ai": "空对象/置信度≤0→待 AI 分析"
+    },
+    "data_boundary": {
+      "real_event_level": ["track_id", "class_name", "direction", "event_type", "rule_judgment.confidence", "rule_judgment.evidence.real_speed_kmh(仅speeding)", "vehicle_info.speed(px/s已标注)"],
+      "not_available": ["逐帧bbox/轨迹（从未持久化，不可恢复）", "plate_color/plate_confidence键不存在", "ai_judgment={} → 待 AI 分析"]
+    },
+    "verification": {
+      "vite_build": "PASS (8.85s)",
+      "unittest_event_media_contract": "PASS (9/9)",
+      "backend_health": "healthy",
+      "browser_events_verified": [
+        "evt_1790324873606_20_4ff131 (wrong_way, 置信度90%, 速度未采集=正确降级)",
+        "evt_1790324876514_39_ee9ac0 (speeding, 速度64.3 km/h=real_speed_kmh, 置信度56%)"
+      ],
+      "screenshots": [
+        "eventdetail_original.png",
+        "eventdetail_analysis.png",
+        "eventdetail_selected.png",
+        "eventdetail_speeding.png"
+      ]
+    },
+    "git": {
+      "branch": "main",
+      "diff_scope": "仅 web-admin/src/views/EventDetail.vue；api/index.js 与 utils/format.js 未改；后端零改动"
+    },
+    "report": "docs/REPORT_TASK-COORD-006B_TRAE.md"
+  }
+}

@@ -1,0 +1,47 @@
+﻿==========================================================================
+1) ������
+==========================================================================
+python.exe : 
+所在位置 行:2 字符: 1
++ & $gpu 'E:\output\_scripts\_verify_hyperlpr.py' 2>&1 | Out-File 'E:\o ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Pull:   0%|          | 0.00/11.9M [00:00<?, ?iB/s]
+Pull:   1%|          | 63.0k/11.9M [00:00<00:19, 624kiB/s]
+Pull:   2%|��         | 256k/11.9M [00:00<00:08, 1.38MiB/s]
+Pull:   6%|��         | 745k/11.9M [00:00<00:03, 2.98MiB/s]
+Pull:  11%|��         | 1.28M/11.9M [00:00<00:02, 4.02MiB/s]
+Pull:  17%|����        | 1.98M/11.9M [00:00<00:02, 5.16MiB/s]
+Pull:  21%|����        | 2.50M/11.9M [00:00<00:01, 5.17MiB/s]
+Pull:  25%|������       | 2.99M/11.9M [00:00<00:01, 5.16MiB/s]
+Pull:  32%|��������      | 3.78M/11.9M [00:00<00:01, 5.99MiB/s]
+Pull:  39%|��������      | 4.65M/11.9M [00:00<00:01, 6.95MiB/s]
+Pull:  46%|����������     | 5.43M/11.9M [00:01<00:00, 7.31MiB/s]
+Pull:  52%|������������    | 6.20M/11.9M [00:01<00:00, 7.53MiB/s]
+Pull:  61%|������������    | 7.25M/11.9M [00:01<00:00, 8.55MiB/s]
+Pull:  70%|��������������   | 8.25M/11.9M [00:01<00:00, 9.09MiB/s]
+Pull:  77%|����������������  | 9.18M/11.9M [00:01<00:00, 9.01MiB/s]
+Pull:  87%|������������������ | 10.3M/11.9M [00:01<00:00, 9.85MiB/s]
+Pull:  96%|��������������������| 11.3M/11.9M [00:01<00:00, 10.1MiB/s]
+Pull: 100%|��������������������| 11.9M/11.9M [00:01<00:00, 7.33MiB/s]
+Traceback (most recent call last):
+  File "E:\output\_scripts\_verify_hyperlpr.py", line 17, in <module>
+    import hyperlpr3 as lpr3
+  File "C:\miniconda\envs\zhitong-gpu\Lib\site-packages\hyperlpr3\__init__.py", line 1, in <module>
+    from .hyperlpr3 import LicensePlateCatcher
+  File "C:\miniconda\envs\zhitong-gpu\Lib\site-packages\hyperlpr3\hyperlpr3.py", line 9, in <module>
+    initialization()
+  File "C:\miniconda\envs\zhitong-gpu\Lib\site-packages\hyperlpr3\config\configuration.py", line 62, in initialization
+    down_model_zip(target_url, _DEFAULT_FOLDER_, True)
+  File "C:\miniconda\envs\zhitong-gpu\Lib\site-packages\hyperlpr3\config\configuration.py", line 42, in down_model_zip
+    os.remove(name)
+PermissionError: [WinError 32] ��һ����������ʹ�ô��ļ��������޷����ʡ�: '\\Users\\ROG\\.hyperlpr3\\20230229.zip'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "E:\output\_scripts\_verify_hyperlpr.py", line 21, in <module>
+    print(f"  \u274c ����ʧ��: {type(e).__name__}: {str(e)[:200]}")
+UnicodeEncodeError: 'gbk' codec can't encode character '\u274c' in position 2: illegal multibyte sequence

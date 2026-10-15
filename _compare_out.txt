@@ -1,0 +1,22 @@
+﻿CNN 权重: 验证准确率 1.000  类别 ['green', 'red', 'yellow']  训练于 2026-10-03 01:17:46
+
+============================================================================
+总样本: 295
+  HSV 判色分布: {'green': 81, 'red': 72, 'unknown': 121, 'yellow': 21}
+  CNN 判色分布: {'green': 73, 'red': 144, 'yellow': 78}
+  CNN 置信度: 中位 1.000  最低 0.520  最高 1.000
+  CNN 低置信(<0.6): 17/295
+
+两者不一致: 139 处  (对比图已存 E:\output\_tl_compare)
+  v1 帧   8 #2: HSV=unknown(0px) vs CNN=red(1.00)  32x45
+  v1 帧   8 #5: HSV=unknown(0px) vs CNN=yellow(0.90)  22x39
+  v1 帧  12 #2: HSV=unknown(0px) vs CNN=red(1.00)  32x45
+  v1 帧  12 #5: HSV=unknown(0px) vs CNN=yellow(0.93)  21x38
+  v1 帧  16 #2: HSV=unknown(0px) vs CNN=red(1.00)  32x45
+  v1 帧  16 #5: HSV=unknown(0px) vs CNN=yellow(0.93)  21x38
+  v1 帧  44 #3: HSV=unknown(0px) vs CNN=red(1.00)  33x44
+  v1 帧  48 #3: HSV=unknown(0px) vs CNN=red(1.00)  33x44
+============================================================================
+判读要点：
+  - CNN 的 unknown 应远少于 HSV（HSV 遇背光/偏色即放弃）
+  - 不一致样本需人工看图仲裁（对比图已导出）

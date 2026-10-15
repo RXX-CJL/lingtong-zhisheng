@@ -1,0 +1,34 @@
+﻿模型对象类型: YOLO
+model.task: detect
+names: {0: 'green', 1: 'red', 2: 'yellow'}
+取到 4 个红绿灯裁剪
+
+==========================================================================
+方式 1：predict 原始返回值结构
+==========================================================================
+  返回类型: Results
+  可用属性: ['boxes', 'cpu', 'cuda', 'keypoints', 'masks', 'names', 'new', 'numpy', 'obb', 'orig_img', 'orig_shape', 'path', 'plot', 'probs', 'save', 'save_crop', 'save_dir', 'save_txt', 'semantic_mask', 'show', 'speed', 'summary', 'to', 'to_csv', 'to_df']
+  probs: None
+  boxes: ultralytics.engine.results.Boxes object with attributes:
+
+cls: tensor([], device='cuda:0')
+conf: tensor([], device='cuda:0')
+data: tensor([], device='cuda:0', size=(0, 6))
+id: None
+is_track: False
+orig_shape: (64, 28)
+shape: torch.Size([0, 6])
+xywh: tensor([], device='cuda:0', size=(0, 4))
+xywhn: tensor([], device='cuda:0', size=(0, 4))
+xyxy: tensor([], device='cuda:0', size=(0, 4))
+xyxyn: tensor([], device='cuda:0', size=(0, 4))
+
+==========================================================================
+方式 2：直接对 tensor 前向（绕过 predict）
+==========================================================================
+  输出结构异常: <class 'torch.Tensor'> torch.Size([1, 7, 84])
+
+==========================================================================
+方式 3：对全部裁剪批量前向（验证可用性）
+==========================================================================
+  失败: KeyError: 188

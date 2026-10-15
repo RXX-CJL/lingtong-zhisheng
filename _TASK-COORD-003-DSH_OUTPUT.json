@@ -1,0 +1,83 @@
+{
+  "task_id": "TASK-COORD-003-DSH",
+  "title": "明文密钥清理（B3）+ .env 加载器补齐 + git 泄漏面体检",
+  "date": "2026-09-27",
+  "executor": "DSH Desktop (deepseek-flash / reasoningEffort=high)",
+  "status": "PASS",
+  "conclusion": "审计报告所述『12 处明文密钥硬编码』在 2026-09-24 的提交 4a67b5a 中已基本消除；真正的缺口是『密钥迁移只做了一半』——api/.env.example 已说明复制为 .env，但项目没有任何 .env 加载器，导致环境变量拿不到值、明文只能留在 config_runtime.json。本次补齐加载器并清除残留明文。",
+  "key_facts": {
+    "audit_claim": "12 处明文密钥（image_recognizer.py:206, config_runtime.json, zhitong/, beforeness/）",
+    "actual": "image_recognizer.py 已改为环境变量优先；zhitong/ 与 beforeness/ 零命中；真实明文仅 api/config_runtime.json 2 处",
+    "root_gap": "无 .env 加载器（无 dotenv/load_dotenv 调用），.env.example 的说明无法兑现",
+    "fix_dependency": "python-dotenv 已存在于 C:\\miniconda\\envs\\zhitong-gpu（Python 3.11.15），零新依赖"
+  },
+  "changes": [
+    {
+      "file": "e:\\output\\1\\api\\config.py",
+      "change": "顶部新增 .env 加载块（try: from dotenv import load_dotenv; load_dotenv(<BASE_DIR>/.env) except: pass），置于任何 os.environ.get 之前",
+      "risk": "低——dotenv 缺失或 .env 不存在时静默跳过，行为与改动前完全一致"
+    },
+    {
+      "file": "e:\\output\\1\\api\\.env",
+      "change": "新建（279 字节），含 DASHSCOPE_API_KEY / DEEPSEEK_API_KEY（从 config_runtime.json 迁移）；已被 .gitignore 忽略",
+      "risk": "低——新文件，不影响既有逻辑"
+    },
+    {
+      "file": "e:\\output\\1\\api\\config_runtime.json",
+      "change": "dashscope/deepseek 的 api_key 置空（其余字段如 call_count/last_ok 保留）",
+      "risk": "中→已被验证消除：环境变量优先且已确认填充"
+    },
+    {
+      "file": "e:\\output\\1\\.gitignore",
+      "change": "在『配置/密钥』段新增备份类通配：*.bak / *.bak-* / *.backup / *.orig / *_backup.json / *config_runtime*.bak*",
+      "risk": "低——只扩大忽略范围"
+    }
+  ],
+  "leak_vector_found_and_closed": {
+    "vector": "清理过程中生成的 api/config_runtime.json.bak-before-secret-cleanup 含完整明文密钥，且因 .gitignore 只忽略精确文件名而不匹配 .bak-*，处于『git add -A 即会被推送』状态",
+    "action": "删除该备份（主文件已清理，备份仅为同目录冗余副本）＋ 新增 gitignore 通配兜底"
+  },
+  "verification": {
+    "level": "三级（真实行为）+ 二级（文件/配置状态）+ 一级（命令结果）",
+    "level1": "清理脚本 exit=0；语法校验 config.py 通过；办公室体检 ok=45 warn=2 fail=0",
+    "level2": [
+      "config_runtime.json 三个 api_key = (EMPTY)，明文残留 NONE，json.load 合法",
+      ".env 未出现在 git status（已被忽略）；config_runtime.json 未被跟踪",
+      "gitignore 新规则实测命中：'*config_runtime*.bak*' 与 '*.bak'",
+      "git 历史：config_runtime.json 与 .env 从未被提交；已跟踪的 395 个文本文件扫描 → 0 处密钥"
+    ],
+    "level3": [
+      "关键测试：清空进程内 DASHSCOPE/DEEPSEEK 环境变量后，仅靠 config.py 的 .env 加载，Config 仍取到 len=35 的两个 Key（指纹与迁移前一致）",
+      "证明『明文已清 且 Key 仍可用』，且来源确为环境变量而非 config 文件"
+    ]
+  },
+  "files_created": [
+    "e:\\output\\1\\api\\.env",
+    "e:\\output\\_TASK-COORD-003-DSH_OUTPUT.json"
+  ],
+  "files_modified": [
+    "e:\\output\\1\\api\\config.py",
+    "e:\\output\\1\\api\\config_runtime.json",
+    "e:\\output\\1\\.gitignore"
+  ],
+  "files_deleted": [
+    "e:\\output\\1\\api\\config_runtime.json.bak-before-secret-cleanup（含明文，见 leak_vector_found_and_closed）"
+  ],
+  "risks": [
+    "config.py 的改动会随该文件被他人覆盖而回退；若 .env 加载器丢失，Key 将回落到 config_runtime.json（现为空）→ 云端分析失效且只记 warning。建议把『config.py 必须加载 .env』写入项目交接报告。",
+    "config_runtime.json 会被代码自动写回（config_manager.save_config）；若用户在设置页重新填写 Key，明文会再次落盘。建议后续改造为只写引用、不落明文。"
+  ],
+  "next_suggestions": [
+    "把『.env 加载器存在』这一前提写入 PROJECT_HANDOVER_REPORT.md 的硬约束段，避免被误删",
+    "设置页保存逻辑改为不落明文（config_manager.set_api_key 只存引用/掩码）",
+    "audit 报告的 B3 标记更新为已解决（本次已改 P1-6；B3 在交接报告 §5.1）",
+    "安装 pytest 到 .venv，让 tests/test_cloud_collaborator_event.py 可运行"
+  ],
+  "git_state": {
+    "repo_root": "E:\\output",
+    "branch": "main",
+    "remote": "https://github.com/RXX-CJL/lingtong-zhisheng.git",
+    "sync": "0/0 与 origin/main 完全同步（远端 = 4a67b5a）",
+    "secrets_in_history": "无"
+  }
+}

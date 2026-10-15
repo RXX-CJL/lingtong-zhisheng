@@ -1,0 +1,13 @@
+﻿    帧 |    红绿灯 | 判色结果（尺寸 / 色量）
+------------------------------------------------------------------------------
+    0 |      2 | #0 7x16 -> unknown {'red': 0, 'yellow': 0, 'green': 0}; #1 6x14 -> unknown {'red': 0, 'yellow': 0, 'green': 0}
+  150 |      3 | #0 7x16 -> unknown {'red': 2, 'yellow': 0, 'green': 0}; #1 6x15 -> unknown {'red': 0, 'yellow': 0, 'green': 0}; #2 6x8 -> unknown {'red': 2, 'yellow': 0, 'green': 0}
+  300 |      2 | #0 7x16 -> unknown {'red': 2, 'yellow': 0, 'green': 0}; #1 6x14 -> unknown {'red': 0, 'yellow': 0, 'green': 0}
+  450 |      2 | #0 7x16 -> unknown {'red': 5, 'yellow': 0, 'green': 0}; #1 6x15 -> unknown {'red': 0, 'yellow': 0, 'green': 0}
+  600 |      2 | #0 7x16 -> unknown {'red': 2, 'yellow': 0, 'green': 0}; #1 6x16 -> unknown {'red': 0, 'yellow': 0, 'green': 0}
+
+==============================================================================
+判色分布: {'unknown': 11}
+可判定比例: 0/11
+裁剪图（放大6倍）: E:\output\_tl_crops
+==============================================================================
