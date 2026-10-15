@@ -1,74 +1,85 @@
-<template>
+﻿<template>
   <div class="dashboard">
-    <!-- 统计卡片 -->
-    <el-row :gutter="20" class="stat-row">
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-icon bg-blue">
-            <el-icon size="28"><Document /></el-icon>
+    <!-- 统计卡片（2026-10-03 由 DSH 重构：主次分明 + 横向布局，消除"6 个相同方块"的默认感） -->
+    <el-row :gutter="16" class="stat-row">
+      <!-- 主卡：总违规数（占 2 列，视觉权重最高） -->
+      <el-col :xs="24" :sm="24" :md="8" :lg="10">
+        <div class="zt-kpi zt-kpi--hero">
+          <div class="zt-kpi__head">
+            <span class="zt-kpi__label">总违规数</span>
+            <span class="zt-kpi__icon kpi-icon--primary">
+              <el-icon size="18"><Document /></el-icon>
+            </span>
           </div>
-          <div class="stat-info">
-            <div class="stat-num">{{ stats.total || 0 }}</div>
-            <div class="stat-label">总违规数</div>
+          <div class="zt-kpi__value zt-kpi-value">{{ stats.total || 0 }}</div>
+          <div class="zt-kpi__foot">
+            <span class="kpi-dot kpi-dot--success"></span>已确认 {{ stats.confirmed || 0 }}
           </div>
-        </el-card>
+        </div>
       </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-icon bg-orange">
-            <el-icon size="28"><Plus /></el-icon>
+
+      <!-- 次卡：4 张紧凑横向卡 -->
+      <el-col :xs="12" :sm="12" :md="8" :lg="4">
+        <div class="zt-kpi">
+          <div class="zt-kpi__row">
+            <span class="zt-kpi__icon kpi-icon--warning">
+              <el-icon size="16"><Plus /></el-icon>
+            </span>
+            <span class="zt-kpi__label">今日新增</span>
           </div>
-          <div class="stat-info">
-            <div class="stat-num">{{ stats.today || 0 }}</div>
-            <div class="stat-label">今日新增</div>
-          </div>
-        </el-card>
+          <div class="zt-kpi__value zt-kpi-value">{{ stats.today || 0 }}</div>
+        </div>
       </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-icon bg-purple">
-            <el-icon size="28"><Calendar /></el-icon>
+
+      <el-col :xs="12" :sm="12" :md="8" :lg="4">
+        <div class="zt-kpi">
+          <div class="zt-kpi__row">
+            <span class="zt-kpi__icon kpi-icon--info">
+              <el-icon size="16"><Calendar /></el-icon>
+            </span>
+            <span class="zt-kpi__label">本月违规</span>
           </div>
-          <div class="stat-info">
-            <div class="stat-num">{{ stats.thisMonth || 0 }}</div>
-            <div class="stat-label">本月违规</div>
-          </div>
-        </el-card>
+          <div class="zt-kpi__value zt-kpi-value">{{ stats.thisMonth || 0 }}</div>
+        </div>
       </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-icon bg-yellow">
-            <el-icon size="28"><Clock /></el-icon>
+
+      <el-col :xs="12" :sm="12" :md="12" :lg="2">
+        <div class="zt-kpi">
+          <div class="zt-kpi__row">
+            <span class="zt-kpi__icon kpi-icon--pending">
+              <el-icon size="16"><Clock /></el-icon>
+            </span>
+            <span class="zt-kpi__label">待审核</span>
           </div>
-          <div class="stat-info">
-            <div class="stat-num">{{ stats.pending || 0 }}</div>
-            <div class="stat-label">待审核</div>
-          </div>
-        </el-card>
+          <div class="zt-kpi__value zt-kpi-value">{{ stats.pending || 0 }}</div>
+        </div>
       </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-icon bg-green">
-            <el-icon size="28"><CircleCheck /></el-icon>
+
+      <el-col :xs="12" :sm="12" :md="12" :lg="2">
+        <div class="zt-kpi">
+          <div class="zt-kpi__row">
+            <span class="zt-kpi__icon kpi-icon--success">
+              <el-icon size="16"><CircleCheck /></el-icon>
+            </span>
+            <span class="zt-kpi__label">已确认</span>
           </div>
-          <div class="stat-info">
-            <div class="stat-num">{{ stats.confirmed || 0 }}</div>
-            <div class="stat-label">已确认</div>
-          </div>
-        </el-card>
+          <div class="zt-kpi__value zt-kpi-value">{{ stats.confirmed || 0 }}</div>
+        </div>
       </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-icon bg-cyan">
-            <el-icon size="28"><Monitor /></el-icon>
+
+      <el-col :xs="12" :sm="12" :md="12" :lg="2">
+        <div class="zt-kpi">
+          <div class="zt-kpi__row">
+            <span class="zt-kpi__icon kpi-icon--online">
+              <el-icon size="16"><Monitor /></el-icon>
+            </span>
+            <span class="zt-kpi__label">设备在线</span>
           </div>
-          <div class="stat-info">
-            <div class="stat-num">{{ stats.onlineDevices || 0 }}</div>
-            <div class="stat-label">设备在线数</div>
-          </div>
-        </el-card>
+          <div class="zt-kpi__value zt-kpi-value">{{ stats.onlineDevices || 0 }}</div>
+        </div>
       </el-col>
     </el-row>
+    <!-- 旧版 KPI 卡片已由上方结构替代（2026-10-03 由 DSH 重构） -->
 
     <!-- 图表区域 -->
     <el-row :gutter="20" class="chart-row">

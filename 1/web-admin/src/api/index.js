@@ -317,6 +317,13 @@ export const getEventFrames = (eventId) => {
   return realtimeRequest.get(`/realtime/events/${encodeURIComponent(eventId)}/frames`)
 }
 
+// 事件逐帧回放数据（TASK-COORD-007）
+// 新事件：success=true + data（本地 YOLO/Tracking 的逐帧 bbox/track_id）
+// 历史事件：success=false + code=no_frame_replay_data（前端诚实降级为事件级标注）
+export const getEventReplay = (eventId) => {
+  return realtimeRequest.get(`/realtime/events/${encodeURIComponent(eventId)}/replay`)
+}
+
 // 人工复核事件（confirmed=true 确认违法 / false 排除事件）
 export const reviewEvent = (eventId, data) => {
   return realtimeRequest.post(

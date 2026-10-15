@@ -1,0 +1,77 @@
+/* 通知中心页样式（2026-10-03 由 DSH 新增） */
+.container { padding: 24rpx; }
+
+/* 顶部操作条 */
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+.bar-left { display: flex; align-items: baseline; gap: 12rpx; }
+.bar-title { font-size: 34rpx; font-weight: 600; color: #111827; }
+.bar-unread { font-size: 24rpx; color: #DC2626; }
+.bar-right { display: flex; gap: 12rpx; }
+.bar-btn {
+  font-size: 24rpx;
+  color: #4B5563;
+  padding: 8rpx 20rpx;
+  border: 2rpx solid #E5E7EB;
+  border-radius: 8rpx;
+  background: #FFFFFF;
+}
+.bar-btn.active { color: #1D4ED8; border-color: #1D4ED8; background: #EFF4FF; }
+
+/* 空态 */
+.empty-card {
+  background: #FFFFFF;
+  border-radius: 16rpx;
+  padding: 60rpx 32rpx;
+  text-align: center;
+  box-shadow: 0 2rpx 12rpx rgba(15, 23, 42, 0.06);
+}
+.empty-icon { font-size: 64rpx; margin-bottom: 16rpx; }
+.empty-title { font-size: 30rpx; font-weight: 600; color: #374151; margin-bottom: 12rpx; }
+.empty-text { font-size: 24rpx; color: #8A9099; line-height: 1.7; margin-bottom: 28rpx; }
+.empty-btn { display: inline-block; padding: 18rpx 48rpx; }
+
+/* 通知项 */
+.noti-item {
+  background: #FFFFFF;
+  border-radius: 16rpx;
+  padding: 22rpx 24rpx;
+  margin-bottom: 16rpx;
+  border-left: 6rpx solid #E5E7EB;
+  box-shadow: 0 2rpx 12rpx rgba(15, 23, 42, 0.05);
+}
+.noti-item.unread { border-left-color: #DC2626; background: #FFFBFB; }
+.noti-item.read { opacity: 0.72; }
+
+.noti-head { display: flex; align-items: center; justify-content: space-between; }
+.noti-title { font-size: 28rpx; font-weight: 600; color: #111827; }
+.noti-dot {
+  width: 14rpx; height: 14rpx; border-radius: 50%;
+  background: #DC2626; flex-shrink: 0;
+}
+.noti-body { font-size: 25rpx; color: #4B5563; line-height: 1.7; margin: 10rpx 0 14rpx; }
+.noti-foot { display: flex; align-items: center; gap: 14rpx; }
+.plate {
+  display: inline-block;
+  padding: 2rpx 12rpx;
+  border-radius: 4rpx;
+  background: #1D4ED8;
+  color: #FFFFFF;
+  font-size: 22rpx;
+  letter-spacing: 1rpx;
+}
+.noti-time { font-size: 22rpx; color: #8A9099; }
+.noti-push { font-size: 20rpx; color: #16A34A; margin-left: auto; }
+.noti-push.off { color: #8A9099; }
+
+.btn {
+  padding: 20rpx 32rpx;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  text-align: center;
+}
+.btn-primary { background: #1D4ED8; color: #FFFFFF; }

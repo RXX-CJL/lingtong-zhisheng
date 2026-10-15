@@ -9,43 +9,113 @@
         <!-- AI模型配置 -->
         <el-tab-pane label="AI模型配置" name="ai">
           <div class="tab-content">
-            <el-form :model="aiConfig" label-width="160px">
-              <el-form-item label="默认模型" required>
-                <el-select v-model="aiConfig.defaultModel" placeholder="请选择模型">
-                  <el-option label="Claude 3.5 Sonnet" value="claude-3.5-sonnet" />
-                  <el-option label="智谱Glm-4V" value="glm-4v" />
-                  <el-option label="DeepSeek-V2" value="deepseek-v2" />
-                  <el-option label="Qwen-VL" value="qwen-vl" />
+            <!-- ★★2026-10-06 由 DSH 改写：这一栏原来是**纯装饰**。
+                 用户原话："我发现系统设置里面有启动AI审核和启动兜底模型的开关，
+                 是我想象的那个关了就不收费了吗？"
+                 核实结论（代码级）：
+                   · 原来的 saveAiConfig() 只弹一句"保存成功"，**没有任何 API 调用**，
+                     默认模型/阈值/超时/重试次数全在组件内存里，刷新即丢；
+                   · "启用AI审核"是假的 —— 真开关在实时监测页，现接到这里；
+                   · "启用兜底模型"是假的，而且**后端根本没有这个功能**
+                     （只在代码里存在自动降级：判色 CNN 失败→HSV、
+                       云端 Claude 失败→豆包、车牌模型缺失→借用 yolov8s，
+                       都是内部机制，不是开关）。
+                 所以本栏改为：**只放真实生效的开关 + 如实标注未实现项**。 -->
+            <el-alert type="warning" :closable="false" show-icon style="margin-bottom:16px">
+              <template #title>本页有两个"云端花钱入口"，都能在这里真实开关</template>
+              <div class="alert-body">
+                关掉后**不会产生任何云端费用**，但事件需要人工复核。逐条说明见下方每项的注解。
+              </div>
+            </el-alert>
+
+            <el-form label-width="180px">
+              <el-form-item label="事件级云端AI复核">
+                <el-switch v-model="rt.cloud_review" @change="pushRuntimeSetting('cloud_review')" />
+                <el-tag :type="rt.cloud_review ? 'danger' : 'success'" size="small" style="margin-left:10px">
+                  {{ rt.cloud_review ? '开 — 每次违规事件都会调用云端（计费）' : '关 — 事件转「待人工复核」，零云调用' }}
+                </el-tag>
+              </el-form-item>
+              <div class="field-note">
+                开：每条违规事件调用**豆包视觉**（3~5 关键帧）+ **DeepSeek** 二级验证
+                （配了 Claude key 还会多一次），按 ai_trace v3 交叉验证后自动判 confirmed/rejected。
+                <br />关：事件进入「待人工复核」，在 <b>交通事件</b> 页点确认/排除即可。
+                <span class="warn-text">这是最大的一笔开销来源。</span>
+              </div>
+
+              <el-form-item label="逐帧云端咨询">
+                <el-switch v-model="rt.cloud_consult" @change="pushRuntimeSetting('cloud_consult')" />
+                <el-tag :type="rt.cloud_consult ? 'warning' : 'success'" size="small" style="margin-left:10px">
+                  {{ rt.cloud_consult ? '开 — 本地判不准时逐帧问云端' : '关 — 不逐帧咨询' }}
+                </el-tag>
+              </el-form-item>
+              <div class="field-note">
+                开：检测循环遇到"本地规则拿不准"的帧时，抽帧问云端（异步，不阻塞检测）。
+                <br />与上面那项是**两条独立的计费支路**，可分别关闭。
+              </div>
+
+              <el-form-item label="未标定的超速也送云端复核">
+                <el-switch v-model="rt.cloud_review_uncalibrated"
+                           @change="pushRuntimeSetting('cloud_review_uncalibrated')" />
+              </el-form-item>
+              <div class="field-note">
+                <span class="warn-text">建议保持关闭。</span>
+                实测：云端视觉模型明确回复"仅凭静态图像无法判定是否超速" ——
+                送审只会白烧 token 并产生 rejected（历史上 364 条事件因此被判 rejected）。
+                已标定的超速不受此项影响，会正常送审。
+              </div>
+
+              <el-form-item label="违规确认时长(秒)">
+                <el-input-number v-model="rt.hold_sec" :min="0" :max="10" :step="0.5"
+                                 @change="pushRuntimeSetting('hold_sec')" />
+                <span class="unit-hint">越大越保守，误报越少、上报越慢（默认 1.5）</span>
+              </el-form-item>
+
+              <el-form-item label="同类违规冷却期(秒)">
+                <el-input-number v-model="rt.cooldown_sec" :min="0" :max="120" :step="1"
+                                 @change="pushRuntimeSetting('cooldown_sec')" />
+                <span class="unit-hint">同一类违规在此时间内不重复上报（默认 8）</span>
+              </el-form-item>
+
+              <el-form-item label="画面标注档位">
+                <el-select v-model="rt.display_mode" style="width:200px"
+                           @change="pushRuntimeSetting('display_mode')">
+                  <el-option label="极简（仅 ID）" value="minimal" />
+                  <el-option label="标准（+速度）" value="standard" />
+                  <el-option label="详细（全部）" value="full" />
+                  <el-option label="仅框线" value="off" />
                 </el-select>
               </el-form-item>
 
-              <el-form-item label="检测阈值">
-                <el-slider v-model="aiConfig.threshold" :min="0" :max="1" :step="0.01" />
-                <span>{{ aiConfig.threshold.toFixed(2) }}</span>
+              <el-form-item>
+                <el-button @click="loadRuntimeSettings" :loading="rtLoading">重新读取后端当前值</el-button>
+                <span class="unit-hint">本栏开关**改一下即生效**（不用点保存）</span>
               </el-form-item>
+            </el-form>
 
-              <el-form-item label="超时时间(秒)">
-                <el-input-number v-model="aiConfig.timeout" :min="5" :max="60" />
-              </el-form-item>
+            <!-- 未实现项：如实标注，不再摆假开关 -->
+            <el-divider content-position="left">以下项后端尚未实现（已从"假开关"改为如实标注）</el-divider>
+            <div class="unimpl">
+              <div class="unimpl-item">
+                <b>默认模型选择</b>（原下拉框：Claude / 智谱 / DeepSeek / Qwen）——
+                后端没有"选一个默认模型"的概念：事件复核是**固定并行**调豆包 + DeepSeek，
+                不是可切换的单模型。需要切换请改用 <code>api/.env</code> 里的 Key。
+              </div>
+              <div class="unimpl-item">
+                <b>超时时间 / 重试次数</b> —— 后端用的是 <code>config.py</code> 的
+                <code>API_TIMEOUT</code> / <code>API_RETRY_TIMES</code>（环境变量），
+                没有运行时接口，页面上改不了也不生效。
+              </div>
+              <div class="unimpl-item">
+                <b>启用兜底模型</b> —— 后端**不存在**这个功能。代码里只有自动降级，
+                不是开关：判色 CNN 不可用 → HSV（<code>traffic_light_classifier.py:198</code>）；
+                云端 Claude 失败 → 豆包（<code>cloud_collaborator.py:216</code>）；
+                车牌模型缺失 → 借用 yolov8s（<code>image_recognizer.py:270</code>）。
+              </div>
+            </div>
 
-              <el-form-item label="启用AI审核">
-                <el-switch v-model="aiConfig.enableAiReview" />
-              </el-form-item>
-
-              <el-form-item label="启用兜底模型">
-                <el-switch v-model="aiConfig.enableFallback" />
-              </el-form-item>
-
-              <el-form-item label="重试次数">
-                <el-input-number v-model="aiConfig.retryCount" :min="0" :max="5" />
-              </el-form-item>
-
+            <el-form label-width="180px" style="margin-top:16px">
               <el-form-item label="API Key管理">
                 <el-button type="primary" @click="showApiKeyDialog = true">管理API Key</el-button>
-              </el-form-item>
-
-              <el-form-item>
-                <el-button type="primary" @click="saveAiConfig">保存配置</el-button>
               </el-form-item>
             </el-form>
 
@@ -316,7 +386,8 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh } from '@element-plus/icons-vue'
-import { getModels, switchModel, unloadModel, initModels, getPerformance, resetPerformance } from '@/api'
+// api 即 index.js 的默认导出（axios 实例，baseURL=/api），用于运行时设置接口
+import api, { getModels, switchModel, unloadModel, initModels, getPerformance, resetPerformance } from '@/api'
 import { getPlugins, switchPlugin, setSceneMode, getSceneModes } from '@/api'
 import DeviceList from './DeviceList.vue'
 import QuotaMonitor from './QuotaMonitor.vue'
@@ -415,14 +486,75 @@ const handlePluginSwitch = async (row, val) => {
   }
 }
 
-const aiConfig = reactive({
-  defaultModel: 'glm-4v',
-  threshold: 0.5,
-  timeout: 30,
-  enableAiReview: true,
-  enableFallback: true,
-  retryCount: 2
+// ★2026-10-06 由 DSH 删除：原 aiConfig（默认模型 / 检测阈值 / 超时 / 启用AI审核 /
+// 启用兜底模型 / 重试次数）是**纯装饰** —— 没有对应后端字段，saveAiConfig() 只弹提示。
+// 留着它会让后来者以为这些设置真的生效。已由下面的 rt（真运行时设置）+ 模板里的
+// "未实现项"说明取代。
+
+/**
+ * ★运行时设置（2026-10-06 由 DSH 新增）—— 这些是**真的接后端**的开关。
+ *
+ * 背景：本页原来的 aiConfig（默认模型/阈值/超时/启用AI审核/启用兜底模型/重试次数）
+ * 是**纯装饰**：saveAiConfig() 只弹一句"保存成功"，没有任何 API 调用，
+ * 刷新即丢，后端完全不知道。用户问"关了就不收费了吗"——答案是当时**照收**。
+ *
+ * 现在改为：读写 /api/realtime/settings，改一下立刻生效。
+ *   cloud_review             事件级云端复核（每条违规打豆包+DeepSeek）★最大开销
+ *   cloud_consult            逐帧咨询（本地不确定时逐帧问云端）
+ *   cloud_review_uncalibrated 未标定的超速是否也送审（建议关）
+ *   hold_sec / cooldown_sec  确认时长 / 同类违规冷却期
+ *   display_mode             画面标注档位
+ */
+const rt = reactive({
+  cloud_review: true,
+  cloud_consult: true,
+  cloud_review_uncalibrated: false,
+  hold_sec: 1.5,
+  cooldown_sec: 8,
+  display_mode: 'minimal',
 })
+const rtLoading = ref(false)
+
+async function loadRuntimeSettings() {
+  rtLoading.value = true
+  try {
+    const r = await api.get('/realtime/settings')
+    const d = r?.data?.data || r?.data
+    if (d) {
+      rt.cloud_review = d.cloud_review !== false
+      rt.cloud_consult = d.cloud_consult !== false
+      rt.cloud_review_uncalibrated = d.cloud_review_uncalibrated === true
+      rt.hold_sec = d.hold_sec ?? rt.hold_sec
+      rt.cooldown_sec = d.cooldown_sec ?? rt.cooldown_sec
+      rt.display_mode = d.display_mode || rt.display_mode
+    }
+  } catch (e) {
+    ElMessage.error('读取运行时设置失败：' + (e?.response?.data?.detail || e.message))
+  } finally { rtLoading.value = false }
+}
+
+/** 只推这一项（不连带其它设置），并按后端回读值回写，杜绝"界面关了后端还开着" */
+async function pushRuntimeSetting(key) {
+  try {
+    const r = await api.post('/realtime/settings', { [key]: rt[key] })
+    const d = r?.data?.data || r?.data
+    if (d && d[key] !== undefined) rt[key] = d[key]
+    if (key === 'cloud_review') {
+      ElMessage({
+        type: rt.cloud_review ? 'warning' : 'success',
+        message: rt.cloud_review
+          ? '已开启事件级云端 AI 复核：每条违规事件都会调用云端，会计费'
+          : '已关闭事件级云端 AI 复核：事件转「待人工复核」，不再产生云端费用',
+        duration: 4000,
+      })
+    } else {
+      ElMessage.success('已生效')
+    }
+  } catch (e) {
+    ElMessage.error('设置失败：' + (e?.response?.data?.detail || e.message))
+    await loadRuntimeSettings()   // 失败则回读真实状态
+  }
+}
 
 const notificationConfig = reactive({
   enableViolationNotify: true,
@@ -541,11 +673,12 @@ onMounted(() => {
   loadApiKeys()
   loadSceneModes()
   loadPlugins()
+  loadRuntimeSettings()      // ★2026-10-06 由 DSH 新增：读出后端真实的云端开关值
 })
 
-const saveAiConfig = () => {
-  ElMessage.success('AI模型配置保存成功')
-}
+// ★2026-10-06 由 DSH 删除 saveAiConfig()：这是**假存根**（只弹提示、不调接口）。
+// 用户正是被它误导："启动AI审核 / 启动兜底模型 …关了就不收费了吗？"
+// —— 当时关了照收。真开关见 loadRuntimeSettings / pushRuntimeSetting。
 
 const saveNotificationConfig = () => {
   ElMessage.success('通知设置保存成功')
@@ -640,6 +773,28 @@ const formatTime = (time) => {
 <style scoped>
 .settings-page { padding: 20px; }
 .tab-content { padding: 20px 0; }
+
+/* ---------- AI 运行时设置栏（2026-10-06 由 DSH 新增） ---------- */
+.alert-body { font-size: 12px; line-height: 1.7; }
+.field-note {
+  margin: -8px 0 18px 180px;
+  font-size: 12px;
+  color: var(--zt-text-muted, #909399);
+  line-height: 1.75;
+}
+.field-note code,
+.unimpl-item code {
+  background: #f5f7fa; border-radius: 3px; padding: 0 4px;
+  font-family: Consolas, Monaco, monospace; font-size: 11px;
+}
+.warn-text { color: #e6a23c; font-weight: 600; }
+.unit-hint { margin-left: 10px; font-size: 12px; color: #909399; }
+.unimpl { font-size: 12px; color: #909399; line-height: 1.8; }
+.unimpl-item {
+  margin-bottom: 8px; padding: 8px 10px;
+  background: #fafafa; border-left: 3px solid #dcdfe6; border-radius: 3px;
+}
+.unimpl-item b { color: #606266; }
 
 .user-header {
   display: flex;

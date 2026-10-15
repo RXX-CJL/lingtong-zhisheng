@@ -24,6 +24,13 @@ const router = createRouter({
       component: () => import('../views/EventCenter.vue')
     },
     {
+      // 实时直播页（2026-10-03 由 DSH 新增）
+      // 三栏裸眼 3D 布局：左=未违规车辆 / 中=视频处理效果 / 右=违规车辆
+      path: '/live',
+      name: 'LiveMonitor',
+      component: () => import('../views/LiveMonitor.vue')
+    },
+    {
       path: '/events/:id',
       name: 'EventDetail',
       component: () => import('../views/EventDetail.vue')

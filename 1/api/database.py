@@ -4,7 +4,19 @@ from sqlalchemy.pool import StaticPool
 import os
 
 # 数据库配置
-DATABASE_URL = "sqlite:///./zhitong_violations.db"
+# 必须锚定到本文件所在目录：SQLAlchemy 的 sqlite:///./x.db 是相对进程 cwd 解析的，
+# 若从项目根启动就会静默连到 E:\output\1\zhitong_violations.db（0 字节空壳），
+# 表现为"总违规数 0"却不报错。此处改为绝对路径，与启动目录无关。
+# （2026-09-27 由 DSH 修复，原行：DATABASE_URL = "sqlite:///./zhitong_violations.db"）
+_DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "zhitong_violations.db")
+DATABASE_URL = "sqlite:///" + _DB_FILE.replace("\\", "/")
+
+# 只读提示：同名的 0 字节空壳文件存在时给出明确警告（不自动删除任何文件）
+_SHELL = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                      "zhitong_violations.db")
+if os.path.exists(_SHELL) and os.path.getsize(_SHELL) == 0:
+    print(f"[database] 注意：检测到 0 字节同名的空壳数据库 {_SHELL}；"
+          f"当前实际使用的是 {_DB_FILE}，请勿误删或误用。")
 
 # 创建数据库引擎
 engine = create_engine(
@@ -36,7 +48,13 @@ def init_db():
 def migrate_missing_columns():
     """检查并添加缺失的列（数据库迁移）"""
     import sqlite3
-    conn = sqlite3.connect("zhitong_violations.db")
+    # ★2026-10-06 由 DSH 修复（G2/T29：本文件 L11 早已锚定绝对路径，此处却漏了）。
+    # 原实现 sqlite3.connect("zhitong_violations.db") 是**相对进程 cwd** 解析的：
+    #   start-all.bat 从项目根 E:\output\1 启动 → 迁移检查作用在
+    #   E:\output\1\zhitong_violations.db（**0 字节空壳**）上 →
+    #   ALTER TABLE 报 "no such table"，被下面的 except 吞掉 → **静默失效**，
+    #   缺列永远补不上，且不报错、不提示。
+    conn = sqlite3.connect(_DB_FILE)
     cursor = conn.cursor()
 
     # 获取当前表的所有列

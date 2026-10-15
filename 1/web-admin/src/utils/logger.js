@@ -31,6 +31,71 @@ const PERSIST_SIZE_WARN_BYTES = 2 * 1024 * 1024 // 2MB 后警告并截断
 const LEVELS = { DEBUG: 10, INFO: 20, WARN: 30, ERROR: 40, FATAL: 50 }
 const LEVEL_ORDER = ['DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL']
 
+/**
+ * ★★2026-10-10 由 DSH 新增：**循环引用安全的 JSON 序列化**。
+ *
+ * 真实事故（用户 2026-10-10 反馈）：在 /settings 页点「导出」报
+ *   TypeError: Converting circular structure to JSON
+ *     --> starting at object with constructor 'Object'
+ *     |     property 'component' -> object with constructor 'Object'
+ *     --- property 'vnode' closes the circle
+ *
+ * 根因链（**两层都错，都要修**）：
+ *   ① push() 里对不可序列化的对象只做 `try { JSON.stringify(a) } catch { extra = a }`
+ *      —— 把**原始对象**（此处是带组件实例的 Vue VNode / 传入的组件 props）
+ *      原封不动存进环形缓冲区，**等于存了一颗定时炸弹**；
+ *   ② exportAsJsonDownload() / persistNow() 再对它 JSON.stringify -> 抛错。
+ *      导出是显式报错（用户看得见）；而 persistNow 的错**被 try/catch 静默吞掉**
+ *      -> localStorage 里那条记录永远存不下来（刷新即丢），且**没有任何提示**。
+ *
+ * 修法：任何要落盘/导出的对象都先过这里 —— 遇到循环引用或 DOM/组件对象就
+ * 替换成可读的占位符，而不是抛错；**保证"导出一定成功"**（日志工具连导出都失败
+ * 就等于没有）。
+ */
+function _safeJson(value, space = 0) {
+  const seen = new WeakSet()
+  try {
+    return JSON.stringify(value, function (key, val) {
+      try {
+        if (typeof val === 'bigint') return String(val) + 'n'
+        if (typeof val === 'function') return '[Function]'
+        if (val && typeof val === 'object') {
+          // ★★绝对不要在这里用 `instanceof` / `Object.getPrototypeOf` / `constructor`！
+          // 本项目的 payload（axios 响应、Vue 组件实例、被打上 Vue 响应式的对象）
+          // 很可能是 **Proxy**，而 Vue 的 getPrototypeOf 陷阱在"目标对象不可扩展"时会
+          // **直接抛 TypeError**，导致**每一个对象**都掉进 catch -> 整个负载变成
+          // "[Unserializable]"（2026-10-10 实测：导出只有 18 字节）。
+          // 这里一律只用"读属性"做鸭子类型判断 —— get 陷阱是安全的。
+          const nodeName = val.nodeName
+          if (typeof nodeName === 'string' && typeof val.nodeType === 'number') {
+            return `[DOM ${nodeName}]`
+          }
+          const el = val.$el
+          const vnode = val.$ && val.$.vnode
+          if (el || vnode !== undefined) return '[VueComponent]'
+          if (seen.has(val)) return '[Circular]'
+          seen.add(val)
+        }
+        return val
+      } catch (_) {
+        return '[Unserializable]'
+      }
+    }, space)
+  } catch (_) {
+    // ★绝不让"序列化失败"升级成"导出失败"：退化成纯字符串
+    try { return String(value) } catch (__) { return '[Unserializable]' }
+  }
+}
+
+/** 会话窗口：把任意值变成**一段必然可显示、可导出**的文本 */
+function _safeStr(value, maxLen = 4000) {
+  try {
+    const s = _safeJson(value)
+    if (typeof s === 'string') return s.length > maxLen ? s.slice(0, maxLen) + '…[truncated]' : s
+  } catch (_) { /* fallthrough */ }
+  try { return String(value).slice(0, maxLen) } catch (_) { return '[unprintable]' }
+}
+
 function tsIso() {
   try { return new Date().toISOString() } catch (_) { return String(Date.now()) }
 }
@@ -69,7 +134,9 @@ function schedulePersist() {
 
 function persistNow() {
   try {
-    const payload = JSON.stringify({
+    // ★2026-10-10：改用 _safeJson —— 万一缓冲区里混进了带循环引用的对象
+    // （旧版本写进去的历史记录、或将来别处误传），也不会让**落盘静默失败**。
+    const payload = _safeJson({
       savedAt: tsIso(),
       items: buffer.getAll()
     })
@@ -78,7 +145,7 @@ function persistNow() {
       const all = buffer.getAll()
       buffer.clear()
       all.slice(Math.floor(all.length / 2)).forEach(e => buffer.push(e))
-      const retry = JSON.stringify({ savedAt: tsIso(), items: buffer.getAll() })
+      const retry = _safeJson({ savedAt: tsIso(), items: buffer.getAll() })
       localStorage.setItem(LOG_STORAGE_KEY, retry)
     } else {
       localStorage.setItem(LOG_STORAGE_KEY, payload)
@@ -127,12 +194,20 @@ function push(level, tag, args) {
     } else if (typeof a === 'string' || typeof a === 'number' || typeof a === 'boolean' || a == null) {
       parts.push(String(a))
     } else {
+      // ★★2026-10-10 由 DSH 修正（导出崩溃的根因①）：
+      // 旧写法 `const s = JSON.stringify(a)` 在 a 有**循环引用**时直接抛错，
+      // 于是走 catch 把**原始对象**存进 extra -> 导出/落盘时才炸。
+      // 现在改为「先安全序列化，再决定放 message 还是 extra」，
+      // **extra 里永远只存字符串**（可显示、必然可导出、必然可落盘）。
+      let s
       try {
-        const s = JSON.stringify(a)
-        if (s.length < 512) parts.push(s); else extra = a
+        s = _safeJson(a)
       } catch (_) {
-        extra = a
+        s = null
       }
+      if (typeof s !== 'string') s = _safeStr(a)
+      if (s.length < 512) parts.push(s)
+      else extra = s
     }
   }
   message = parts.join(' ')
@@ -206,13 +281,31 @@ const logger = {
   /** 导出 JSON 文件下载 */
   exportAsJsonDownload(filename = 'zhitong-frontend-log.json') {
     try {
-      const payload = JSON.stringify({
-        exportedAt: tsIso(),
-        href: typeof location !== 'undefined' ? location.href : '',
-        ua: typeof navigator !== 'undefined' ? navigator.userAgent : '',
-        total: buffer.size(),
-        items: buffer.getAll()
-      }, null, 2)
+      // ★2026-10-10：改用 _safeJson（原来直接 JSON.stringify 会因循环引用抛错，
+      // 用户点「导出」直接报错，而第 5 项"MJPEG 僵尸流"取证正要靠这份导出）。
+      // 另外加一道**兜底**：万一整体序列化仍失败，就逐条导出，**绝不整份丢失**
+      // （日志工具的价值就在于"出事时它还能用"，不能反过来成为新的故障点）。
+      let payload = null
+      try {
+        payload = _safeJson({
+          exportedAt: tsIso(),
+          href: typeof location !== 'undefined' ? location.href : '',
+          ua: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+          total: buffer.size(),
+          items: buffer.getAll()
+        }, 2)
+      } catch (e1) {
+        const lines = buffer.getAll().map(it => {
+          try { return _safeJson(it) } catch (_) { return _safeStr(it) }
+        })
+        payload = _safeJson({
+          exportedAt: tsIso(),
+          degraded: true,
+          reason: String(e1).slice(0, 200),
+          total: buffer.size(),
+          items: lines
+        }, 2)
+      }
       const blob = new Blob([payload], { type: 'application/json;charset=utf-8' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -227,6 +320,23 @@ const logger = {
       console.error('[logger] 导出失败', e)
       return false
     }
+  },
+
+  /** 诊断摘要（★2026-10-10 新增）：一键复制用，只要最关键的信息 */
+  diagnosticSummary() {
+    const all = buffer.getAll()
+    const byLevel = {}
+    all.forEach(x => { byLevel[x.level] = (byLevel[x.level] || 0) + 1 })
+    const fails = all.filter(x => /FAIL|timeout|超时|失败|ECONN|Network Error/i.test(x.message || ''))
+    const tail = fails.slice(-40).map(x => `${x.t} [${x.level}] ${x.tag || '-'} ${(x.message || '').slice(0, 300)}`)
+    return [
+      `导出时间: ${tsIso()}`,
+      `页面: ${typeof location !== 'undefined' ? location.href : ''}`,
+      `日志总数: ${all.length}  级别分布: ${_safeJson(byLevel)}`,
+      `疑似失败条数: ${fails.length}`,
+      '--- 最近 40 条疑似失败（FAIL/timeout/超时/失败） ---',
+      ...tail
+    ].join('\n')
   },
 
   /** 立即强制落盘 */

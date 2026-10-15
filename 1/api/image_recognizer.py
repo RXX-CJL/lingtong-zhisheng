@@ -28,6 +28,11 @@ except ImportError:
 
 yolo_models = {}
 paddleocr_detector = None
+# ★2026-10-06 由 DSH 新增：多模型检测**实际生效**的序列（默认 5 个，
+# 可被环境变量 YOLO_MODEL_SEQUENCE 裁剪）。multi_model_detect 每次调用刷新它，
+# /api/realtime/status 把它暴露出去 —— 让"到底跑了哪几个模型"可观测，
+# 不再需要靠翻日志猜（`cmd /k` 新窗口的 stdout 并不落在日志文件里）。
+ACTIVE_MODEL_SEQUENCE = []
 
 # DashScope API Key（通过 _get_dashscope_key() 动态获取）
 DASHSCOPE_API_KEY = ""
@@ -559,6 +564,47 @@ TRAFFIC_CLASSES = {
     11: 'stop sign'
 }
 
+# ★★2026-10-09 由 DSH 新增：**交通检测类白名单**（唯一权威版本）
+#
+# 起因（用户原话）："画面中甚至还识别了路旁的盆栽"。
+# 根因（设计单 §12.6 问题 2）：COCO 有 80 类，`CLASS_CN_MAP` 里有 107 个类名，
+#   其中 **83 类与交通无关**（potted plant / fire hydrant / sports ball / chair /
+#   bench / dog / cake …），而渲染器主循环**只跳过红绿灯、其余照画** ->
+#   只要上游 YOLO 输出它们，就会被画到画面上。
+# 修法：**按白名单裁**，而不是"排掉盆栽"—— 只排一个等于掩耳盗铃，
+#   下一个视频会冒出别的垃圾类。裁点选在 process_frame 的检测出口，
+#   这样规则引擎/行为引擎/跟踪器/渲染器**同时**都不再受垃圾框干扰
+#   （历史证据：`license_plate` 模型文件不存在 -> 静默回退 COCO yolov8s ->
+#     每帧产出 12 个垃圾框，白花 ~30ms，见 _PROJECT_MAP.md T73）。
+#
+# ⚠ 维护须知：本集合是**判定链路的输入契约**。规则引擎里出现新的类名分组
+#   （violation_rules.py: VEHICLE_CLASSES / HELMET_CLASSES / PERSON_CLASSES /
+#    TRAFFIC_SIGNAL_CLASSES / *_LIGHT_CLASSES / LANE_LINE_CLASSES /
+#    NO_HELMET_CLASSES / STOP_SIGN_CLASSES …）时，这里必须同步补上，
+#   否则那条规则会被**静默废掉**（本项目已有同类教训：判色白名单漏裸色名
+#   -> 红绿灯框一个都画不出来，实测 0/520 帧）。
+# 观测：/status 的 class_filter_stats 会报告实际挡掉了什么，先看它再改这里。
+TRAFFIC_CLASS_WHITELIST = {
+    # 车辆 / 两轮 / 行人（violation_rules.VEHICLE_CLASSES / PERSON_CLASSES）
+    'car', 'motorcycle', 'truck', 'bus', 'bicycle',
+    'person', 'rider', 'motorcyclist', 'cyclist', 'pedestrian',
+    # 信号灯：COCO 原生是带空格的 'traffic light'；
+    # 裸色名来自 MODEL_CONFIG['traffic_light']（其 class_name 直接被换成颜色）
+    'traffic light', 'traffic_light',
+    'red_light', 'green_light', 'yellow_light',
+    'red', 'green', 'yellow',
+    'traffic_light_red', 'traffic_light_green', 'traffic_light_yellow',
+    # 交通标志
+    'stop sign', 'stop_sign', 'yield', 'yield_sign', 'give_way',
+    # 头盔（MODEL_CONFIG['helmet'] 实际输出 with_helmet / without_helmet）
+    'helmet', 'with_helmet', 'without_helmet', 'no_helmet', 'no-helmet',
+    'head', 'hard_hat', 'safety_helmet',
+    # 车道线（MODEL_CONFIG['lane']）
+    'lane_line', 'road_line', 'white_line', 'yellow_line',
+    # 车牌（MODEL_CONFIG['license_plate']）
+    'license_plate', 'plate', 'car_plate',
+}
+
 def _process_image_input(image_input):
     """处理图片输入，返回 numpy 数组"""
     if image_input.startswith('data:image') or 'base64,' in image_input:
@@ -618,7 +664,14 @@ def detect_with_yolo(image_input, model_key='yolov8n', conf_threshold=0.25):
                 'model_key': model_key
             }
         
-        results = model(img, conf=conf_threshold)
+        # 推理分辨率（2026-10-03 由 DSH 修复）
+        # 原实现未指定 imgsz，Ultralytics 默认 640 -> 960x432 的输入被缩到 288x640，
+        # 导致远处小目标（红绿灯、车牌、头盔）直接消失：
+        #   实测同一模型，traffic light 检出数 imgsz=640 -> 1~3，imgsz=1920 -> 2~5，
+        #   且总检出数 20 -> 31（帧0）。代价是推理耗时 6ms -> 35ms（仍远快于帧间隔）。
+        # 可用环境变量 YOLO_IMGSZ 覆盖（如低配机器可设 640）。
+        _imgsz = int(os.environ.get('YOLO_IMGSZ', '1280'))
+        results = model(img, conf=conf_threshold, imgsz=_imgsz)
         
         detections = []
         class_names = model.names if hasattr(model, 'names') else {}
@@ -834,14 +887,50 @@ def multi_model_detect(image_input, conf_threshold=0.25):
     all_detections = []
     detection_set = set()
     
-    model_sequence = [
+    # ★★2026-10-06 由 DSH 改为**可配置**（环境变量 YOLO_MODEL_SEQUENCE）。
+    # 起因（实测数据）：用户反馈"识别框帧率太低、跟不上车"。定位后：
+    #   · 每处理 1 帧要串行跑这 5 个模型，**稳态 139ms/帧**（GPU 只占 393MB/8.5GB）；
+    #   · 但端到端真实吞吐只有 ~3 fps（338ms/帧）-> 提 FRAME_RATE 也上不去；
+    #   · 其中 `license_plate` **模型文件根本不存在**，回退成 COCO yolov8s，
+    #     检出的却是"消防栓/盆栽/运动球"这类无关目标（实测 12 个），
+    #     既白花 ~30ms/帧，又把这些垃圾塞进 all_detections 污染去重与规则判定。
+    # 所以按场景裁剪模型序列是**正确且必要**的优化，而不是偷工减料：
+    #   闯红灯/测速场景实际只需要 vehicle + traffic_light（+ 需要时 helmet）。
+    # 用法（不设则保持原样，向后兼容）：
+    #   YOLO_MODEL_SEQUENCE=vehicle,traffic_light,helmet
+    _DEFAULT_SEQ = [
         ('vehicle', '高精度车辆检测'),
         ('traffic_light', '红绿灯检测'),
         ('helmet', '头盔检测'),
         ('lane', '车道线检测'),
-        ('license_plate', '车牌检测')
+        ('license_plate', '车牌检测'),
     ]
-    
+    _want = os.environ.get('YOLO_MODEL_SEQUENCE', '').strip()
+    if _want:
+        _names = {'vehicle': '高精度车辆检测', 'traffic_light': '红绿灯检测',
+                  'helmet': '头盔检测', 'lane': '车道线检测',
+                  'license_plate': '车牌检测'}
+        picked = [(k.strip(), _names.get(k.strip(), k.strip()))
+                  for k in _want.split(',') if k.strip() in _names]
+        model_sequence = picked or _DEFAULT_SEQ
+        if picked and not getattr(multi_model_detect, '_seq_logged', False):
+            multi_model_detect._seq_logged = True
+            print(f'[multi_model_detect] 模型序列由 YOLO_MODEL_SEQUENCE 裁剪为: '
+                  f'{[k for k, _ in picked]}（默认 5 个）')
+    else:
+        model_sequence = _DEFAULT_SEQ
+
+    # ★2026-10-06 由 DSH 新增：把**实际生效的序列**记为模块级状态，
+    # 供 /api/realtime/status 暴露（配置必须可观测，不能靠猜日志）。
+    # 起因：核对"helmet/lane 到底在不在跑"时只能翻日志，而 `cmd /k` 新窗口的
+    # stdout 不落在日志文件里 -> 无法判定运行中实例的真实配置。
+    # （本项目历史上已有同类教训：U1/G3"外部无法判定实际加载哪版模型"。）
+    try:
+        import image_recognizer as _self_mod
+        _self_mod.ACTIVE_MODEL_SEQUENCE = [k for k, _ in model_sequence]
+    except Exception:
+        pass
+
     for model_key, model_name in model_sequence:
         result = detect_with_yolo(image_input, model_key, conf_threshold)
         detection_result[f'{model_key}_detection'] = result
@@ -1029,18 +1118,55 @@ def analyze_with_doubao(image_input, violation_type, context_prompt=""):
         
         # 设置 API Key
         dashscope.api_key = DASHSCOPE_API_KEY
-        
-        # 处理图片输入
-        if image_input.startswith('data:image') or 'base64,' in image_input:
-            if 'base64,' in image_input:
-                base64_data = image_input.split('base64,')[1]
-            else:
-                base64_data = image_input
+
+        # ---- 图片输入归一化（2026-10-02 由 DSH 补充）--------------------
+        # 原实现只处理 3 种输入：data: URI / 文件路径 / base64 字符串，
+        # 一旦传入 numpy 数组（BGR）或 PIL.Image 就直接崩在
+        #   image_input.startswith(...)  ->  AttributeError:
+        #   'numpy.ndarray' object has no attribute 'startswith'
+        # 该异常被上层 try/except 吞掉，表现为"豆包（主视觉分析）永远失败"，
+        # 进而使事件级多模型仲裁退化为单模型审核（事件被大量误驳回）。
+        # 这里统一转换为 base64 字符串，兼容所有调用方的传参习惯。
+        try:
+            if isinstance(image_input, np.ndarray):
+                _ok, _buf = cv2.imencode('.jpg', image_input,
+                                         [cv2.IMWRITE_JPEG_QUALITY, 85])
+                if not _ok:
+                    return {
+                        'success': False, 'result_text': '',
+                        'is_violation_confirmed': False, 'confidence_adjusted': 0.0,
+                        'message': 'numpy 图像编码失败', 'prompt': ''
+                    }
+                image_input = base64.b64encode(_buf.tobytes()).decode('utf-8')
+            elif type(image_input).__name__ == 'Image':
+                import io as _io
+                _b = _io.BytesIO()
+                image_input.convert('RGB').save(_b, format='JPEG', quality=85)
+                image_input = base64.b64encode(_b.getvalue()).decode('utf-8')
+            elif isinstance(image_input, (bytes, bytearray)):
+                image_input = base64.b64encode(bytes(image_input)).decode('utf-8')
+        except Exception as _e:
+            return {
+                'success': False, 'result_text': '',
+                'is_violation_confirmed': False, 'confidence_adjusted': 0.0,
+                'message': f'图像输入归一化失败: {_e}', 'prompt': ''
+            }
+
+        # 处理图片输入（统一归一化：数组 / PIL / bytes / 文件路径 / data:URI / 纯 base64）
+        import re as _re
+        if isinstance(image_input, str) and 'base64,' in image_input:
+            base64_data = image_input.split('base64,', 1)[1]
             data_url = f"data:image/jpeg;base64,{base64_data}"
-        elif os.path.exists(image_input):
+        elif isinstance(image_input, str) and os.path.exists(image_input):
             # 从文件读取并转为 base64
             with open(image_input, 'rb') as f:
                 base64_data = base64.b64encode(f.read()).decode('utf-8')
+            data_url = f"data:image/jpeg;base64,{base64_data}"
+        elif isinstance(image_input, str) and len(image_input) >= 24 and \
+                _re.fullmatch(r'[A-Za-z0-9+/=\r\n]+', image_input):
+            # 纯 base64 字符串（无 data: 前缀）——原实现不支持此形态，会误判为
+            # Invalid image input；此处显式识别（2026-10-02 由 DSH 修复）
+            base64_data = image_input.strip()
             data_url = f"data:image/jpeg;base64,{base64_data}"
         else:
             return {
@@ -1114,21 +1240,24 @@ def analyze_with_doubao(image_input, violation_type, context_prompt=""):
 
             # ===== 严格解析结果（v2 修复版：避免「不存在」不会再误判为「存在」）
             is_confirmed = False
+            is_uncertain = False
             confidence_adjusted = 0.3  # 默认偏保守
 
             import re
             text_lower = result_text.lower()
 
-            # ---------- 第 1 步：优先查找方括号标记（最可靠信号：【是】/【否】/【不确定】
+            # 优先信任格式化结论；“不确定”与“否”必须分开保存。
             bracket_match = re.search(r'[【\[]\s*(是|否|不确定|不確定|未违规|未发现|不存在)\s*[】\]]', result_text)
             if bracket_match:
                 signal = bracket_match.group(1)
-                if signal in ['是']:
+                if signal == '是':
                     is_confirmed = True
-                elif signal in ['否', '不确定', '不確定', '未违规', '未发现', '不存在']:
+                elif signal in ('不确定', '不確定'):
+                    is_uncertain = True
+                else:
                     is_confirmed = False
             else:
-                # ---------- 第 2 步：严格关键字分析
+                # ---------- 第 2 步：严格关键字分析                # ---------- 第 2 步：严格关键字分析
                 # 先查否定表达（优先级最高，避免"不存在"被误判）
                 neg_patterns = [
                     r'不存在违规', r'没有发现.*违规', r'未发现.*违规',
@@ -1147,24 +1276,24 @@ def analyze_with_doubao(image_input, violation_type, context_prompt=""):
                     r'：是', r':\s*是',
                 ]
                 found_pos = any(re.search(p, result_text) for p in pos_patterns)
+                found_uncertain = bool(re.search(r'不确定|不確定|无法判断|无法确定|信息不足|证据不足', result_text))
 
-                # 判定逻辑：否定优先 > 肯定；都没找到 → 检查"是"关键字兜底
-                if found_neg and not found_pos:
+                # 缺少证据时不能把“不确定”当成“确认不存在违规”。
+                if found_uncertain and not found_pos and not found_neg:
+                    is_uncertain = True
+                elif found_neg and not found_pos:
                     is_confirmed = False
                 elif found_pos and not found_neg:
                     is_confirmed = True
                 elif found_pos and found_neg:
-                    # 两者都出现 → 取"是否违规："或"第二步"后面的关键字
+                    # 两者都出现 → 取“是否违规”或“第二步”后面的明确结论
                     m = re.search(r'(?:是否违规|第二步|第二步.*是否|结论|判定|判断)[^。\n]*[：:]\s*([^。\n]+)', result_text)
                     if m:
-                        is_confirmed = '是' in m.group(1) and '否' not in m.group(1)
+                        conclusion = m.group(1)
+                        is_uncertain = bool(re.search(r'不确定|不確定|无法判断|无法确定', conclusion))
+                        is_confirmed = ('是' in conclusion and '否' not in conclusion and not is_uncertain)
                     else:
-                        is_confirmed = False  # 冲突时保守判定为未违规
-                else:
-                    # 无明确关键词 → 检查单独的 "是" 字（需排除"不是""是否"等组合）
-                    cleaned = re.sub(r'(不是|是否|但是|可是|只是|于是|还是|特别是|尤其是)', '', result_text)
-                    is_confirmed = bool(re.search(r'[，|^|\s)是(?![否个])', cleaned))
-
+                        is_uncertain = True
             # ---------- 第 3 步：提取置信度（优先找"置信度"或"评分"字段）
             try:
                 conf_match = re.search(r'(?:置信度|置信|评分|可能性|信心)[^0-9]{0,10}(\d{1,3})\s*(?:分|%|％)?', result_text)
@@ -1193,6 +1322,7 @@ def analyze_with_doubao(image_input, violation_type, context_prompt=""):
                 'success': True,
                 'result_text': result_text,
                 'is_violation_confirmed': is_confirmed,
+                'is_uncertain': is_uncertain,
                 'confidence_adjusted': confidence_adjusted,
                 'message': '豆包分析成功',
                 'prompt': prompt
@@ -1297,8 +1427,10 @@ def analyze_with_deepseek_judge(violation_type, yolo_result_dict, doubao_result_
             'prompt': ''
         }
 
-    # 准备 YOLO 的摘要（结构化）
-    if yolo_result_dict and yolo_result_dict.get('success'):
+    # 原始 YOLO 置信度未随事件上下文传入时，明确标注“不可用”，不要伪装成 0.00。
+    if yolo_result_dict and yolo_result_dict.get('confidence_available') is False:
+        yolo_summary = '- ' + str(yolo_result_dict.get('message') or '本次事件未提供原始 YOLO 置信度，无法评估该字段')
+    elif yolo_result_dict and yolo_result_dict.get('success'):
         dets = yolo_result_dict.get('detections', [])
         car_like = [d for d in dets if d.get('class_name') in ['car', 'motorcycle', 'bus', 'truck']]
         other_obj = [d for d in dets if d.get('class_name') not in ['car', 'motorcycle', 'bus', 'truck']]
@@ -1314,13 +1446,12 @@ def analyze_with_deepseek_judge(violation_type, yolo_result_dict, doubao_result_
                 len(other_obj), '、'.join(["{}(置信度{:.2f})".format(d['class_name'], d['confidence']) for d in top3_other])
             ))
         if not dets:
-            yolo_summary_lines.append("- YOLO 未检测到任何显著对象（可能图片中无车辆/目标）")
+            yolo_summary_lines.append("- 本次事件未提供可量化的 YOLO 目标置信度")
         yolo_summary = '\n'.join(yolo_summary_lines)
     else:
-        yolo_summary = "- YOLO 检测失败或未启用（原因：{}）".format(
+        yolo_summary = "- YOLO 检测结果不可用（原因：{}）".format(
             yolo_result_dict.get('message', '未知') if yolo_result_dict else '未提供检测结果'
         )
-
     # 准备豆包推理
     doubao_success = doubao_result_dict and doubao_result_dict.get('success')
     doubao_raw = doubao_result_dict.get('result_text', '') if doubao_result_dict else ''
@@ -1414,25 +1545,26 @@ def analyze_with_deepseek_judge(violation_type, yolo_result_dict, doubao_result_
 
             # 解析 DeepSeek 的输出
             is_confirmed = False
+            is_uncertain = False
             confidence_adjusted = 0.3
             risk_level = 'medium'
 
             import re
-            # 第三步·你的独立判断：【是违规】/【不是违规】/【无法确定·需人工】
+            # 第三步·独立判断：【是违规】/【不是违规】/【无法确定·需人工】
             judge_match = re.search(r'第三步[^\n]*[：:][^\n]*[【\[]\s*(是违规|不是违规|无法确定|无法确定·需人工|不能确定|不确定)\s*[】\]]', result_text)
             if judge_match:
                 signal = judge_match.group(1)
                 if signal == '是违规':
                     is_confirmed = True
-                else:
-                    is_confirmed = False
+                elif signal in ('无法确定', '无法确定·需人工', '不能确定', '不确定'):
+                    is_uncertain = True
             else:
-                # 兜底：找"是违规"/"不是违规"/"无法确定"关键词
-                if re.search(r'是违规', result_text) and not re.search(r'不是违规', result_text):
+                if re.search(r'无法确定|不能确定|不确定|证据不足', result_text):
+                    is_uncertain = True
+                elif '是违规' in result_text and '不是违规' not in result_text:
                     is_confirmed = True
-                elif re.search(r'不是违规|无法确定|不能确定', result_text):
+                elif '不是违规' in result_text:
                     is_confirmed = False
-
             # 置信度
             conf_match = re.search(r'第四步[^\n]*[：:][^\n]*(\d{1,3})', result_text)
             if conf_match:
@@ -1458,9 +1590,10 @@ def analyze_with_deepseek_judge(violation_type, yolo_result_dict, doubao_result_
                 'success': True,
                 'result_text': result_text,
                 'is_violation_confirmed': is_confirmed,
+                'is_uncertain': is_uncertain,
                 'confidence_adjusted': confidence_adjusted,
                 'risk_level': risk_level,
-                'doubao_opinion_match': doubao_match,
+                'doubao_opinion_match': (None if is_uncertain else is_confirmed == doubao_decision),
                 'message': 'DeepSeek 审核成功',
                 'prompt': prompt
             }
@@ -1848,6 +1981,7 @@ def analyze_with_claude(image_input, violation_type, context_prompt=""):
             print(f"Claude result: {result_text}")
 
             is_confirmed = False
+            is_uncertain = False
             confidence_adjusted = 0.3
             risk_level = 'medium'
 
@@ -1856,12 +1990,16 @@ def analyze_with_claude(image_input, violation_type, context_prompt=""):
                 signal = decision_match.group(1)
                 if signal == '是':
                     is_confirmed = True
-                elif signal in ['否', '不确定']:
+                elif signal == '不确定':
+                    is_uncertain = True
+                else:
                     is_confirmed = False
             else:
-                if '是违规' in result_text and '不是违规' not in result_text:
+                if re.search(r'无法确定|无法判断|不确定|证据不足', result_text):
+                    is_uncertain = True
+                elif '是违规' in result_text and '不是违规' not in result_text:
                     is_confirmed = True
-                elif '不是违规' in result_text or '不确定' in result_text:
+                elif '不是违规' in result_text:
                     is_confirmed = False
 
             conf_match = re.search(r'第四步[^\n]*[：:][^\n]*(\d{1,3})', result_text)
@@ -1888,6 +2026,7 @@ def analyze_with_claude(image_input, violation_type, context_prompt=""):
                 'success': True,
                 'result_text': result_text,
                 'is_violation_confirmed': is_confirmed,
+                'is_uncertain': is_uncertain,
                 'confidence_adjusted': confidence_adjusted,
                 'risk_level': risk_level,
                 'message': 'Claude 分析成功',

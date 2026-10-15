@@ -24,6 +24,16 @@
             <el-icon><VideoCamera /></el-icon>
             <span>智能识别</span>
           </el-menu-item>
+          <!-- ★2026-10-06 由 DSH 新增：/live 此前**没有任何入口**，
+               用户只能手打 URL 才能进实时监测页（反馈原话："管理端没有途径能进 /live"） -->
+          <el-menu-item index="/live">
+            <el-icon><Monitor /></el-icon>
+            <span>实时监测</span>
+          </el-menu-item>
+          <el-menu-item index="/events">
+            <el-icon><Bell /></el-icon>
+            <span>交通事件</span>
+          </el-menu-item>
           <el-menu-item index="/disagreements">
             <el-icon><WarningFilled /></el-icon>
             <span>分歧审核</span>
@@ -54,13 +64,17 @@ import {
   Document,
   PieChart,
   WarningFilled,
-  Setting
+  Setting,
+  Monitor,
+  Bell
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
 // 子路由 → 主菜单项映射：访问子页面时高亮对应主菜单
 const subToMain = {
-  '/events': '/violations',
+  // ★2026-10-06 由 DSH 修正：原先 /events 被映射到「违规管理」，
+  // 现在 /live 与 /events 都有了自己的顶级入口，不再蹭别人的高亮。
+  '/events': '/events',
   '/appeals': '/violations',
   '/realtime': '/ai-detect',
   '/ai-trace': '/ai-detect',

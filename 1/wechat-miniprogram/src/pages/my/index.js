@@ -16,20 +16,36 @@ Page({
       rejected: 0
     },
     menuItems: [
-      { id: 'appeals', title: '我的申诉', icon: '/assets/icons/appeal.png', path: '/pages/appeal/list' },
-      { id: 'devices', title: '设备绑定', icon: '/assets/icons/device.png', path: '/pages/my/devices' },
-      { id: 'settings', title: '设置', icon: '/assets/icons/settings.png', path: '/pages/my/settings' }
-    ]
+      // 2026-10-03 由 DSH 修正：原菜单指向 /pages/my/devices 与 /pages/my/settings，
+      // 这两个页面**并不存在**（点击会报错）。改为指向真实存在的新页面。
+      { id: 'vehicles', title: '车辆绑定', icon: '/assets/icons/device.png', path: '/pages/my/bind' },
+      { id: 'notifications', title: '通知中心', icon: '/assets/icons/appeal.png', path: '/pages/notifications/index' },
+      { id: 'appeals', title: '我的申诉', icon: '/assets/icons/appeal.png', path: '/pages/appeal/list' }
+    ],
+    vehicleCount: 0,
+    unreadCount: 0
   },
   
   onLoad() {
     this.loadUserInfo()
     this.loadAppealStats()
+    this.loadBindInfo()
   },
   
   onShow() {
     this.loadUserInfo()
     this.loadAppealStats()
+    this.loadBindInfo()
+  },
+  
+  // 加载绑定车辆数与未读通知数（2026-10-03 由 DSH 新增）
+  loadBindInfo() {
+    app.request('/bind/status').then(data => {
+      this.setData({ vehicleCount: ((data && data.my_vehicles) || []).length })
+    }).catch(() => {})
+    app.request('/overview').then(data => {
+      this.setData({ unreadCount: (data && data.unread) || 0 })
+    }).catch(() => {})
   },
   
   // 加载用户信息

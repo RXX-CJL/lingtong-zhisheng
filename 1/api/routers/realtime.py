@@ -13,12 +13,17 @@
 """
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, Response
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import asyncio
 import json
 import logging
+import os
+import cv2
+
+from image_recognizer import CLASS_CN_MAP
+from violation_rules import VIOLATION_TYPE_CN
 
 from realtime_detector import realtime_detector
 
@@ -39,11 +44,24 @@ class DetectFrameRequest(BaseModel):
 
 @router.post("/start", response_model=StartDetectionResponse)
 def start_detection(request: StartDetectionRequest):
+    # 必须在切换/释放采集源之前检查运行状态，避免重复点击先替换正在使用的数据源。
+    if realtime_detector.running:
+        return JSONResponse(
+            content={"success": False, "message": "检测已在运行中，请先停止后再切换数据源"},
+            status_code=409,
+        )
+    # 上一轮仍有事件正在提取证据时，不允许新一轮清空循环缓存。
+    if getattr(realtime_detector, "_pending_event_evidence", None):
+        return JSONResponse(
+            content={"success": False, "message": "上一轮事件证据仍在保存，请稍后重试"},
+            status_code=409,
+        )
     # start_camera 内部 cv2.VideoCapture 为阻塞调用，放线程池执行
     try:
         realtime_detector.start_camera(request.camera_index, request.video_path)
         result = realtime_detector.start_detection()
-        return JSONResponse(content=result)
+        status_code = 200 if result.get("success") else 409
+        return JSONResponse(content=result, status_code=status_code)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"启动检测失败: {str(e)}")
 
@@ -219,6 +237,512 @@ def get_tracked_vehicles():
         "data": vehicles,
         "count": len(vehicles)
     })
+
+@router.get("/zoom-frame")
+def get_zoom_frame(track_id: Optional[int] = None,
+                   cx: Optional[int] = None, cy: Optional[int] = None,
+                   scale: float = 2.0, quality: int = 88):
+    """按目标裁剪并放大当前帧（2026-10-03 由 DSH 新增）
+
+    用途：支撑直播页的"拉近-定格-拉远"抓拍动画。
+    前端无法从 MJPEG 流拿到原始帧，故由后端按目标框裁剪返回 JPEG。
+
+    参数：
+      track_id: 优先——按该追踪车辆的 bbox 裁剪
+      cx, cy  : 退而求其次——按画面坐标为中心裁剪
+      scale   : 放大倍数（1.0~4.0，只影响裁剪范围，不改变分辨率上限）
+      quality : JPEG 质量
+
+    注意（重要）：本接口仅供**展示层**使用。
+      落盘证据（uploads/realtime_*.jpg）始终是**原始整帧**，不做任何裁剪放大，
+      以保证证据链完整性与可追溯性。
+    """
+    try:
+        d = realtime_detector
+        with d.lock:
+            frame = None if d.current_frame is None else d.current_frame.copy()
+            tracked = dict(d.tracked_vehicles or {})
+        if frame is None:
+            raise HTTPException(status_code=404, detail="当前无画面")
+
+        H, W = frame.shape[:2]
+        bbox = None
+        if track_id is not None:
+            veh = tracked.get(track_id) or tracked.get(str(track_id))
+            if veh and len(veh.get("bbox") or []) >= 4:
+                bbox = [float(v) for v in veh["bbox"][:4]]
+        if bbox is None:
+            if cx is None or cy is None:
+                # 没有目标：返回整帧（前端可据此平滑回退）
+                ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, quality])
+                return Response(content=buf.tobytes(), media_type="image/jpeg")
+            bbox = [cx - 40, cy - 40, cx + 40, cy + 40]
+
+        x1, y1, x2, y2 = bbox
+        w, h = max(8.0, x2 - x1), max(8.0, y2 - y1)
+        # 放大倍数 -> 裁剪范围收缩：scale 越大，取的区域越小（越"近"）
+        s = max(1.0, min(4.0, float(scale)))
+        pad = 0.6                      # 目标周围留白比例
+        half_w = (w / 2.0) * (1.0 + pad) / s
+        half_h = (h / 2.0) * (1.0 + pad) / s
+        cxp, cyp = (x1 + x2) / 2.0, (y1 + y2) / 2.0
+        nx1 = int(max(0, cxp - half_w)); nx2 = int(min(W, cxp + half_w))
+        ny1 = int(max(0, cyp - half_h)); ny2 = int(min(H, cyp + half_h))
+        if nx2 - nx1 < 16 or ny2 - ny1 < 16:
+            raise HTTPException(status_code=400, detail="裁剪区域过小")
+        crop = frame[ny1:ny2, nx1:nx2]
+        ok, buf = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, quality])
+        if not ok:
+            raise HTTPException(status_code=500, detail="编码失败")
+        return Response(content=buf.tobytes(), media_type="image/jpeg",
+                        headers={"X-Crop": f"{nx1},{ny1},{nx2},{ny2}",
+                                 "Cache-Control": "no-store"})
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"取裁剪帧失败: {str(e)}")
+
+
+@router.get("/evidence")
+def list_realtime_evidence(limit: int = 24, violation_type: Optional[str] = None):
+    """列出实时抓拍的证据图（2026-10-03 由 DSH 新增）
+
+    数据来源：Config.UPLOAD_DIR 下的 realtime_{类型}_{时间戳}.jpg
+    这些是**原始整帧**（未裁剪、未放大），用于证据留存。
+
+    返回：[{name, url, type, type_cn, time, size_kb, mtime}]
+    """
+    try:
+        from config import Config
+        d = Config.UPLOAD_DIR
+        if not os.path.isdir(d):
+            return JSONResponse(content={"success": True, "data": [], "dir": d,
+                                         "message": "证据目录不存在"})
+        import re as _re
+        # ★★2026-10-06 由 DSH 修复（实测性能问题，很可能是用户反馈"刷新页面卡住"的元凶）：
+        #   原实现 `glob(realtime_*.jpg)` -> 对**每一个**文件 os.stat() -> 排序 -> 才切片 limit。
+        #   现场实测：uploads/ 下有 4526 个文件（其中 4513 张实时抓拍），
+        #   于是**每次请求要 stat 4513 次、却只返回 24 条** -> 稳定 **500ms**；
+        #   而前端每 1.5 秒轮询一次，还顺带加载 24 张 2MB 级原图。
+        #   现改为 os.scandir 单次遍历（DirEntry 自带 stat 缓存，比 os.stat 快一个量级），
+        #   并按 mtime 取前 N 再建对象 —— 仍保证"最新的在前"语义不变。
+        limit_n = max(1, min(200, int(limit)))
+        entries = []
+        with os.scandir(d) as it:
+            for e in it:
+                nm = e.name
+                if not (nm.startswith("realtime_") and nm.endswith(".jpg")):
+                    continue
+                # ★2026-10-10 由 DSH 放宽：文件名的时间戳现在带**毫秒**，且用 `-` 与
+                #   秒部分分隔（`realtime_{类型}_{YYYYmmdd}_{HHMMSS}-{mmm}.jpg`）。
+                #   用 `-` 而不是 `_` 是为了让"最后一段下划线后是时间戳"的
+                #   类型解析规则继续成立（否则类型会变成 red_light_221353）。
+                #   老文件（无毫秒）与新文件都要认。
+                m = _re.match(r"realtime_(.+?)_(\d{8}_\d{6}(?:-\d{3})?)\.jpg$", nm)
+                vtype = m.group(1) if m else "unknown"
+                if violation_type and violation_type not in vtype:
+                    continue
+                try:
+                    st = e.stat()          # DirEntry.stat() 复用 scandir 已取到的信息
+                except OSError:
+                    continue
+                entries.append((st.st_mtime, nm, vtype,
+                                m.group(2) if m else "", st.st_size))
+        entries.sort(key=lambda x: x[0], reverse=True)   # 新的在前
+        total = len(entries)
+
+        # ★★2026-10-10 由 DSH 新增：**给抓拍证据补上关键信息**（用户要求
+        #   "只要下方的违规抓拍证据能有记录就行，而且最好要有违法时间等关键信息"）。
+        #   原先这里只回 文件名/类型/大小/时间(来自文件名)，看不出：
+        #     · 违法时间（精确到秒的真实时间，而不是文件名里的紧凑格式）
+        #     · 是哪辆车（track_id）、置信度、车牌
+        #   这些都在 `violation_evidences` 表里（`_persist_violation` 落库时写了）。
+        #   做法：只对**本次要返回的那些行**（≤ limit）按 image_path 批量查一次，
+        #   避免 T68 那类"先做重活再切片"的性能坑。
+        _detail = {}
+        try:
+            import sqlite3
+            from config import Config
+            names = [nm for (_m, nm, _t, _s, _z) in entries[:limit_n]]
+            if names:
+                marks = ",".join("?" * len(names))
+                cx = sqlite3.connect(Config.DB_PATH, timeout=5)
+                try:
+                    cx.row_factory = sqlite3.Row
+                    for r in cx.execute(
+                            f"select image_path, id, violation_type, track_id, confidence, "
+                            f"timestamp, plate_number, status "
+                            f"from violation_evidences where image_path in ({marks})",
+                            names):
+                        _detail[r["image_path"]] = r
+                finally:
+                    cx.close()
+        except Exception as e:
+            logger.debug(f"[evidence] 查询证据详情失败（仅影响附加信息）: {e}")
+
+        items = []
+        for (mtime, nm, vtype, stamp, size) in entries[:limit_n]:
+            row = _detail.get(nm)
+            # 文件名里的时间戳：YYYYmmdd_HHMMSS[-mmm] -> YYYY-MM-DD HH:MM:SS(.mmm)
+            cap_time = ""
+            try:
+                _s = stamp.replace("_", "")
+                if len(_s) >= 14:
+                    cap_time = (f"{_s[0:4]}-{_s[4:6]}-{_s[6:8]} "
+                                f"{_s[8:10]}:{_s[10:12]}:{_s[12:14]}"
+                                + (f".{stamp.split('-')[1]}" if '-' in stamp else ""))
+            except Exception:
+                cap_time = stamp
+            items.append({
+                "name": nm,
+                "url": f"/uploads/{nm}",
+                "type": vtype,
+                "type_cn": VIOLATION_TYPE_CN.get(vtype, vtype),
+                "time": stamp.replace("_", " "),
+                # ↓ 关键信息（可能为空：早期抓拍未落库 / 查询失败）
+                "captured_at": cap_time,                       # 抓拍时间（文件名，最可靠）
+                "violation_at": (str(row["timestamp"]) if row and row["timestamp"] else None),
+                "record_id": (int(row["id"]) if row else None),
+                "track_id": (int(row["track_id"]) if row and row["track_id"] is not None else None),
+                "confidence": (round(float(row["confidence"]), 3)
+                               if row and row["confidence"] is not None else None),
+                "plate_number": (row["plate_number"] if row else None),
+                "review_status": (row["status"] if row else None),
+                "size_kb": round(size / 1024.0, 1),
+                "mtime": mtime,
+            })
+        return JSONResponse(content={"success": True, "data": items,
+                                     "total": total, "dir": d})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"列出证据失败: {str(e)}")
+
+
+@router.get("/settings")
+def get_settings():
+    """读取运行时设置（检测开关 / 置信度门槛 / 冷却期 / 云端开关）"""
+    try:
+        from realtime_detector import get_runtime_settings
+        return JSONResponse(content={"success": True, "data": get_runtime_settings()})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"读取设置失败: {str(e)}")
+
+
+@router.post("/settings")
+def update_settings(patch: dict):
+    """更新运行时设置（无需重启，立即生效）
+
+    请求体示例：
+      {
+        "enabled_types": {"red_light": false},          // 关掉某类检测
+        "min_confidence": {"illegal_parking": 0.75},    // 调高门槛
+        "hold_sec": 2.0, "cooldown_sec": 10,
+        "cloud_consult": false                          // 暂停云端咨询（省 token）
+      }
+    返回更新后的完整设置。
+    """
+    try:
+        from realtime_detector import update_runtime_settings
+        data = update_runtime_settings(patch or {})
+        logger.info(f"[settings] 运行时设置已更新: {list((patch or {}).keys())}")
+        return JSONResponse(content={"success": True, "data": data})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"更新设置失败: {str(e)}")
+
+
+@router.get("/vehicles")
+def get_vehicles_split():
+    """车辆左右分流列表（2026-10-03 由 DSH 新增，供直播页三栏布局使用）
+
+    返回：
+      clean     - 未违规车辆（左栏）：ID / 类型 / 速度 / 方向 / 车牌
+      violators - 违规车辆（右栏）：上述信息 + 违规类型 + 置信度
+      summary   - 计数与阈值快照
+
+    分流依据：当前帧违规列表（_last_violations）按 track_id 归属。
+    车辆若从违规变为未违规，会自动出现在 clean 中（满足"动态迁移"需求）。
+    """
+    try:
+        d = realtime_detector
+        with d.lock:
+            tracked = dict(d.tracked_vehicles or {})
+            plates = dict(getattr(d, "_plate_cache", {}) or {})
+            violations = list(getattr(d, "_last_violations", []) or [])
+            # 带时效的最近违规优先（2026-10-03 由 DSH 新增）
+            # _last_violations 在有违规的帧才非空，且无违规帧立刻清空；
+            # 违规受确认时长/冷却期抑制，导致页面几乎读不到 -> 右栏恒空。
+            recent = []
+            try:
+                recent = list(d.get_recent_violations() or [])
+            except Exception:
+                recent = []
+            if recent:
+                # 合并去重：最近违规 + 本帧违规（本帧优先）
+                seen = set()
+                merged = []
+                for v in violations + recent:
+                    k = (v.get("violation_type"),
+                         v.get("vehicle_id") or v.get("track_id"),
+                         round(float(v.get("confidence", 0) or 0), 3))
+                    if k in seen:
+                        continue
+                    seen.add(k)
+                    merged.append(v)
+                violations = merged
+            lights = list(getattr(d, "_last_traffic_lights", []) or [])
+
+        viol_map = {}
+        _unassigned = []          # 无几何依据、未归属到任何车辆的告警
+        # 先尝试直接按 track_id / vehicle_id 归属（行为引擎的违规带此字段）
+        _unmatched = []
+        def _extract_tid(v):
+            """从违规对象里挖出 track_id（2026-10-03 由 DSH 重写）
+
+            踩坑记录：ID 可能藏在多处，实测 wrong_way 的 ID 在
+              evidence.wrong_way_details[0].vehicle_id
+            原先只看顶层与 evidence 直接字段，导致提取率 0%。
+            现在按优先级：顶层 -> evidence 直接 -> evidence 下的明细列表。
+            """
+            keys = ("track_id", "vehicle_id", "id")
+            # ① 顶层 / evidence 直接字段
+            for src in (v, v.get("evidence") or {}):
+                if isinstance(src, dict):
+                    for k in keys:
+                        if src.get(k) is not None:
+                            try:
+                                return int(float(src[k]))
+                            except (TypeError, ValueError):
+                                pass
+            # ② evidence 下的明细列表（wrong_way_details / details / vehicles ...）
+            ev = v.get("evidence") or {}
+            if isinstance(ev, dict):
+                for val in ev.values():
+                    if isinstance(val, list):
+                        for item in val:
+                            if isinstance(item, dict):
+                                for k in keys:
+                                    if item.get(k) is not None:
+                                        try:
+                                            return int(float(item[k]))
+                                        except (TypeError, ValueError):
+                                            pass
+            return None
+
+        # 当前有效追踪 ID 集合（用于校验提取出的 ID 是否仍然有效）
+        _valid_ids = set()
+        for _k in tracked.keys():
+            try:
+                _valid_ids.add(int(_k))
+            except (TypeError, ValueError):
+                pass
+
+        # ★★2026-10-10 由 DSH 记录一次"做了又按用户口径改回"的取舍：
+        #   用户反馈"违规告警栏没有反应"，我先做成"车辆驶出画面后仍保留告警卡片
+        #   （stale=True，前端标「已离开画面」）"。用户随后明确口径：
+        #     **"其实汽车离开画面后就不用显示了（之前是完全不显示，所以问题很大），
+        #       只要下方的违规抓拍证据能有记录就行，而且最好要有违法时间等关键信息"**
+        #   -> 即：**告警栏只服务于"画面里正在发生的违规"**；已经离开的由
+        #      **下方的抓拍证据（带时间等关键信息）**承担留痕职责。
+        #   所以这里不再生成 stale 卡片；ID 失效就照旧跳过（车辆已不在画面）。
+        #   ⚠ 真正修掉"没反应"的是另一件事：**重复违规（loop_dedup 命中）仍然喂展示缓存**
+        #      （见 realtime_detector._push_repeat_alert）—— 那一层保留。
+        for v in violations:
+            tid = _extract_tid(v)
+            entry = {
+                "type": v.get("violation_type"),
+                "type_cn": v.get("violation_type_cn") or v.get("violation_type"),
+                "confidence": round(float(v.get("confidence", 0) or 0), 3),
+                "source": v.get("source", "rule_engine"),
+                "age_sec": v.get("_age_sec"),
+                # ★2026-10-10：跨圈重复抑制命中的"重复出现"（只展示、不存证、不计费）
+                "repeat": bool(v.get("repeat")),
+            }
+            # 2026-10-03 由 DSH 修正：提取到的 ID 必须**仍在当前追踪集合里**。
+            # 实测 wrong_way 的 evidence 里写着 vehicle_id=3，但当时追踪只有
+            # ID1/ID2 —— ID3 是已消失车辆的旧 ID，直接采纳会指向不存在的车
+            # （前端右栏因此永远匹配不上）。失效则退化为几何匹配。
+            if tid is not None and tid not in _valid_ids:
+                # 该车已驶出画面 / tracker 已丢弃它 —— 按用户口径**不进告警栏**
+                # （留痕由下方的抓拍证据承担，见 /evidence 的关键信息）
+                entry["_stale_id"] = tid
+                tid = None
+            if tid is not None:
+                viol_map.setdefault(tid, []).append(entry)
+            else:
+                _unmatched.append((v, entry))
+
+        # 规则引擎的违规**不带 track_id**（只有 location/evidence），
+        # 用空间匹配归属到追踪车辆（2026-10-03 由 DSH 修复）：
+        #   ① evidence/location 里的 bbox 与车辆框做 IoU
+        #   ② location 是点 -> 判断落在哪个车辆框内
+        #   ③ 退化：全场仅一辆车时直接归属
+        if _unmatched:
+            tb = []
+            for tid, veh in tracked.items():
+                try:
+                    ti = int(tid)
+                except (TypeError, ValueError):
+                    continue
+                bb = veh.get("bbox") or []
+                if len(bb) >= 4:
+                    tb.append((ti, [float(x) for x in bb[:4]]))
+
+            def _by_iou(bb):
+                if not bb or len(bb) < 4:
+                    return None
+                ax1, ay1, ax2, ay2 = [float(x) for x in bb[:4]]
+                a_area = max(1.0, (ax2 - ax1) * (ay2 - ay1))
+                best, best_iou = None, 0.0
+                for ti, t in tb:
+                    ix1, iy1 = max(ax1, t[0]), max(ay1, t[1])
+                    ix2, iy2 = min(ax2, t[2]), min(ay2, t[3])
+                    if ix2 <= ix1 or iy2 <= iy1:
+                        continue
+                    inter = (ix2 - ix1) * (iy2 - iy1)
+                    b_area = max(1.0, (t[2] - t[0]) * (t[3] - t[1]))
+                    iou = inter / (a_area + b_area - inter)
+                    if iou > best_iou:
+                        best, best_iou = ti, iou
+                return best if best_iou >= 0.2 else None
+
+            def _by_point(pt):
+                """按 location 判断归属（2026-10-03 由 DSH 扩展）
+
+                兼容两种 location 结构：
+                  ① {'x': .., 'y': ..}
+                  ② {'bbox': [x1,y1,x2,y2], 'center_x': .., 'center_y': ..}  ← 实测常见
+                原实现只读 x/y，对 ② 永远拿不到坐标，导致违规全部落入"未归属"。
+                """
+                if not isinstance(pt, dict):
+                    return None
+                px = py = None
+                for kx, ky in (("x", "y"), ("center_x", "center_y"),
+                               ("cx", "cy"), ("point_x", "point_y")):
+                    try:
+                        if pt.get(kx) is not None and pt.get(ky) is not None:
+                            px, py = float(pt[kx]), float(pt[ky])
+                            break
+                    except (TypeError, ValueError):
+                        continue
+                if px is None:
+                    bb = pt.get("bbox") or pt.get("target_bbox")
+                    if isinstance(bb, (list, tuple)) and len(bb) >= 4:
+                        try:
+                            px = (float(bb[0]) + float(bb[2])) / 2.0
+                            py = (float(bb[1]) + float(bb[3])) / 2.0
+                        except (TypeError, ValueError):
+                            return None
+                if px is None:
+                    return None
+                for ti, t in tb:
+                    if t[0] <= px <= t[2] and t[1] <= py <= t[3]:
+                        return ti
+                return None
+
+            for v, entry in _unmatched:
+                tid = None
+                for src in (v.get("evidence") or {}, v.get("location") or {}, v):
+                    if isinstance(src, dict):
+                        bb = src.get("bbox") or src.get("target_bbox") or src.get("vehicle_bbox")
+                        if isinstance(bb, (list, tuple)) and len(bb) >= 4:
+                            tid = _by_iou(bb)
+                            if tid is not None:
+                                break
+                if tid is None:
+                    tid = _by_point(v.get("location"))
+                # 不再"全场仅一辆车就硬归给它"（2026-10-03 由 DSH 修正）：
+                # 无几何依据的归属会造成"违规挂到无关车辆"（实测红灯违规
+                # 被挂到画面中央卡车）。宁可留空，由前端显示为未归属告警。
+                if tid is not None:
+                    viol_map.setdefault(tid, []).append(entry)
+                else:
+                    _unassigned.append(entry)
+
+        clean, violators = [], []
+        # 速度标定器（视频测速：像素位移 -> km/h）
+        # 2026-10-03 由 DSH 新增：把 tracker 的"像素/秒"换算成"km/h"，
+        # 并标注可信度（calibrated / assumed），供超速判定与人工复核参考。
+        try:
+            from speed_calibration import SpeedCalibrator, speed_from_history
+            scene = getattr(d, "_scene_annotation", None) or {}
+            _frame = None
+            with d.lock:
+                if d.current_frame is not None:
+                    _frame = d.current_frame
+            _h, _w = (_frame.shape[:2] if _frame is not None else (576, 1280))
+            calib = SpeedCalibrator(scene, frame_width=_w, frame_height=_h)
+            _speed_info = calib.info()
+        except Exception:
+            SpeedCalibrator = None
+            speed_from_history = None
+            calib = None
+            _speed_info = {}
+
+        for tid, veh in tracked.items():
+            try:
+                tid_i = int(tid)
+            except (TypeError, ValueError):
+                continue
+            sp = veh.get("speed")
+            item = {
+                "track_id": tid_i,
+                "class_name": veh.get("class_name"),
+                "class_name_cn": CLASS_CN_MAP.get(veh.get("class_name"), veh.get("class_name")),
+                "speed_px": round(float(sp), 2) if isinstance(sp, (int, float)) else None,
+                "direction": veh.get("direction"),
+                "bbox": veh.get("bbox"),
+                "plate": plates.get(tid_i) or veh.get("plate_number") or None,
+                "is_wrong_way": bool(veh.get("is_wrong_way")),
+                "frame_count": veh.get("frame_count"),
+            }
+            # 真实车速估算（基于轨迹历史 + 标定）
+            if speed_from_history is not None and calib is not None:
+                try:
+                    est = speed_from_history(veh.get("history") or [], calib)
+                    item["speed_kmh"] = est.get("kmh")
+                    item["speed_method"] = est.get("method")
+                    item["speed_confidence"] = est.get("confidence")
+                    # 补充测速细节（2026-10-03 由 DSH 新增）
+                    # measurement_quality: ok / sparse / broken —— 采样质量
+                    # kmh_raw: 未做帧率补偿的原始值（便于复核与对比）
+                    item["speed_quality"] = est.get("measurement_quality")
+                    item["speed_kmh_raw"] = est.get("kmh_raw")
+                    item["speed_fps"] = est.get("fps")
+                    item["speed_compensation"] = est.get("fps_compensation")
+                except Exception:
+                    item["speed_kmh"] = None
+            vs = viol_map.get(tid_i)
+            if vs:
+                item["violations"] = vs
+                item["primary_violation"] = vs[0]["type_cn"]
+                item["confidence"] = vs[0]["confidence"]
+                violators.append(item)
+            else:
+                clean.append(item)
+
+        clean.sort(key=lambda x: x["track_id"])
+        violators.sort(key=lambda x: -x.get("confidence", 0))
+
+        return JSONResponse(content={
+            "success": True,
+            "data": {
+                "clean": clean,
+                "violators": violators,
+                "unassigned": _unassigned,
+                "traffic_lights": lights,
+                "speed_calibration": _speed_info,
+                "summary": {
+                    "clean_count": len(clean),
+                    "violator_count": len(violators),
+                    "tracked_total": len(tracked),
+                    "violation_hold_sec": float(os.environ.get("VIOLATION_HOLD_SEC", "1.5")),
+                    "violation_cooldown_sec": float(os.environ.get("VIOLATION_COOLDOWN_SEC", "8")),
+                    "min_report_default": float(os.environ.get("MIN_REPORT_DEFAULT", "0.65")),
+                },
+            },
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"取车辆分流失败: {str(e)}")
+
 
 @router.get("/behavior-stats")
 def get_behavior_stats():
@@ -798,18 +1322,15 @@ def _sync_active_events_to_db():
                 evt_dict = event.to_dict() if hasattr(event, 'to_dict') else event
                 # 查询是否已存在
                 existing = db.query(TrafficEventRecord).filter_by(event_id=event_id).first()
-                trigger_dt = None
-                if evt_dict.get('trigger_time'):
-                    try:
-                        trigger_dt = datetime.fromtimestamp(float(evt_dict['trigger_time']))
-                    except Exception:
-                        trigger_dt = None
+                # trigger_time 是源视频内的相对秒数，不能转换成 Unix 时间。
+                # 仅使用独立的 wall_time 更新真实发生时间；旧事件缺少 wall_time 时保留数据库原值。
+                from traffic_event_engine import wall_time_to_datetime
+                trigger_dt = wall_time_to_datetime(evt_dict.get('wall_time'))
 
                 common_fields = {
                     'event_type': evt_dict.get('event_type'),
                     'track_id': evt_dict.get('track_id'),
                     'state': evt_dict.get('state', 'detecting'),
-                    'trigger_time': trigger_dt,
                     'vehicle_info': json.dumps(evt_dict.get('vehicle_info', {}), ensure_ascii=False),
                     'scene_context': json.dumps(evt_dict.get('scene_context', {}), ensure_ascii=False),
                     'trajectory': json.dumps(evt_dict.get('trajectory', []), ensure_ascii=False),
@@ -823,6 +1344,14 @@ def _sync_active_events_to_db():
                     'camera_id': f"cam_{realtime_detector.camera_index}",
                     'updated_at': datetime.utcnow(),
                 }
+                # 没有可信墙钟时间时，不要用 None 或视频相对时间覆盖既有真实时间。
+                if trigger_dt is not None:
+                    common_fields['trigger_time'] = trigger_dt
+                elif not existing:
+                    # 仅用于缺少 wall_time 的旧事件首次建档，使用数据库创建时刻，
+                    # 不伪造“视频第 N 秒”对应的现实时间。
+                    common_fields['trigger_time'] = datetime.utcnow()
+
                 if existing:
                     for k, v in common_fields.items():
                         setattr(existing, k, v)
@@ -999,6 +1528,70 @@ def get_event_video(event_id: str):
 
     return FileResponse(video_path, media_type="video/mp4",
                         filename=f"{event_id}.mp4")
+
+
+@router.get("/events/{event_id}/replay")
+def get_event_replay(event_id: str):
+    """逐帧回放数据接口（TASK-COORD-007）
+
+    数据来源：事件录制时随视频一并写出的 sidecar JSON
+    （{event_video_path}.replay.json），内容为本地 YOLO/Tracking 的
+    真实逐帧 bbox/track_id，不含任何云端 AI 结论。
+
+    - 有 sidecar → success=true + data（frames 数组）
+    - 无 sidecar（历史事件）→ success=false + code=no_frame_replay_data，
+      前端据此诚实降级为事件级标注，不显示伪造框
+    """
+    import os
+
+    video_path = ""
+    # 1) 内存查找
+    event = realtime_detector.active_events.get(event_id)
+    if event is not None:
+        video_path = getattr(event, 'event_video_path', '') or ''
+
+    # 2) 数据库查找
+    if not video_path:
+        try:
+            from database import SessionLocal
+            from models import TrafficEventRecord
+            db = SessionLocal()
+            try:
+                record = db.query(TrafficEventRecord).filter_by(event_id=event_id).first()
+                if record and record.event_video_path:
+                    video_path = record.event_video_path
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(f"[realtime.events] 回放视频路径查询失败: {e}")
+
+    if not video_path or not os.path.exists(video_path):
+        return JSONResponse(content={
+            "success": False,
+            "code": "no_frame_replay_data",
+            "message": "事件视频不存在或尚未生成，无逐帧回放数据",
+        }, status_code=404)
+
+    sidecar_path = video_path + '.replay.json'
+    if not os.path.exists(sidecar_path):
+        return JSONResponse(content={
+            "success": False,
+            "code": "no_frame_replay_data",
+            "message": "该事件无逐帧回放数据（历史事件未采集逐帧检测框）",
+        })
+
+    try:
+        with open(sidecar_path, 'r', encoding='utf-8') as f:
+            sidecar = json.load(f)
+        return JSONResponse(content={
+            "success": True,
+            "event_id": event_id,
+            "data": sidecar,
+        })
+    except Exception as e:
+        logger.error(f"[realtime.events] 回放数据读取失败: {e}")
+        return JSONResponse(content={"success": False, "message": f"回放数据读取失败: {e}"},
+                           status_code=500)
 
 
 @router.get("/events/{event_id}/frames")

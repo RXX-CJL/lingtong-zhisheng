@@ -630,20 +630,42 @@ async def upload_violation_multipart(
         filepath = os.path.join(UPLOAD_DIR, filename)
         
         # 保存文件
+        # ★★2026-10-06 由 DSH 重写（真 bug）：
+        #   原实现是 `content = await file.read()` **整个读进内存**，**然后**才判大小，
+        #   而且此刻文件已 open 在磁盘上 -> 超大文件会：
+        #     ① 先吃掉与文件等大的内存（1 GB 视频 = 1 GB RAM）；
+        #     ② 被拒绝时已在 uploads/ 留下半个垃圾文件，永不清理。
+        #   现改为**流式分块**：边读边写边累计，超限立刻中止并删掉半成品。
+        #   上限同时从 50MB 提到 500MB（用户要传 120MB 的真实路口视频）。
+        #   注：要测"整段长视频/数 GB"仍推荐走「实时监测」页的路径接入
+        #       （后端直接读原文件，不复制、无上限）。
+        MAX_FILE_SIZE = 500 * 1024 * 1024  # 500MB
+        _CHUNK = 1024 * 1024               # 1MB/块
         try:
+            written = 0
+            too_large = False
             with open(filepath, "wb") as f:
-                content = await file.read()
-                
-                # 文件大小检查
-                MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
-                if len(content) > MAX_FILE_SIZE:
-                    return ApiResponse(
-                        success=False,
-                        message="文件大小超过 50MB 限制，请压缩后重试",
-                        error_code="FILE_TOO_LARGE"
-                    )
-                
-                f.write(content)
+                while True:
+                    chunk = await file.read(_CHUNK)
+                    if not chunk:
+                        break
+                    written += len(chunk)
+                    if written > MAX_FILE_SIZE:
+                        too_large = True
+                        break
+                    f.write(chunk)
+            if too_large:
+                # 关键：把已写入的半成品删掉，不留垃圾
+                try:
+                    os.remove(filepath)
+                except OSError:
+                    pass
+                return ApiResponse(
+                    success=False,
+                    message=(f"文件超过 {MAX_FILE_SIZE // (1024 * 1024)}MB 上限。"
+                             f"要传更大的视频请到「实时监测」页按路径接入（不复制文件、无上限）"),
+                    error_code="FILE_TOO_LARGE"
+                )
         except PermissionError as pe:
             # 权限问题
             print(f"❌ 文件写入权限不足: {filepath}")
@@ -672,6 +694,13 @@ async def upload_violation_multipart(
         final_confidence = 0.5
         ai_trace = None
         ai_error = None
+        # ★2026-10-06 由 DSH 修复（真 bug）：`result` 原来**只**在"图片 + run_ai"
+        #   分支里被赋值，而下面 L801 无条件读 `result.get(...)` -> 视频上传或
+        #   run_ai=false 时抛 UnboundLocalError("cannot access local variable
+        #   'result'")，被外层 except 兜成 UPLOAD_ERROR。
+        #   **实测后果：视频上传 100% 失败**（与 50MB/500MB 上限无关）。
+        #   这里补上初始化，并把下面那两行改成有值才读。
+        result = None
         
         is_image = file_ext in allowed_image_exts
         is_video = file_ext in allowed_video_exts
@@ -776,9 +805,12 @@ async def upload_violation_multipart(
             additional_info['ai_trace'] = ai_trace
         
         # 保存 DeepSeek 审核结果和人工审核标记
-        if result.get('deepseek_result') and result['deepseek_result'].get('success'):
+        # ★2026-10-06 由 DSH 加 `result` 判空：视频分支 / run_ai=false 时 result 为 None
+        if isinstance(result, dict) and result.get('deepseek_result') \
+                and result['deepseek_result'].get('success'):
             additional_info['deepseek_audit'] = result['deepseek_result']['result_text']
-        additional_info['needs_human_review'] = result.get('needs_human_review', False)
+        additional_info['needs_human_review'] = bool(
+            result.get('needs_human_review', False)) if isinstance(result, dict) else False
         
         db_violation = ViolationEvidence(
             violation_type=violation_type,

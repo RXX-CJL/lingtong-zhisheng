@@ -1,0 +1,46 @@
+{
+    "pages":  [
+                  "pages/index/index",
+                  "pages/violation/list",
+                  "pages/violation/detail",
+                  "pages/appeal/list",
+                  "pages/appeal/submit",
+                  "pages/my/index",
+                  "pages/my/bind",
+                  "pages/notifications/index"
+              ],
+    "window":  {
+                   "navigationBarTitleText":  "智瞳交管",
+                   "navigationBarBackgroundColor":  "#1D4ED8",
+                   "navigationBarTextStyle":  "white",
+                   "backgroundColor":  "#F5F7FA",
+                   "enablePullDownRefresh":  false
+               },
+    "tabBar":  {
+                   "color":  "#8A9099",
+                   "selectedColor":  "#1D4ED8",
+                   "backgroundColor":  "#FFFFFF",
+                   "borderStyle":  "black",
+                   "list":  [
+                                {
+                                    "pagePath":  "pages/index/index",
+                                    "text":  "首页"
+                                },
+                                {
+                                    "pagePath":  "pages/violation/list",
+                                    "text":  "违规"
+                                },
+                                {
+                                    "pagePath":  "pages/appeal/list",
+                                    "text":  "申诉"
+                                },
+                                {
+                                    "pagePath":  "pages/my/index",
+                                    "text":  "我的"
+                                }
+                            ]
+               },
+    "style":  "v2",
+    "sitemapLocation":  "sitemap.json",
+    "lazyCodeLoading":  "requiredComponents"
+}

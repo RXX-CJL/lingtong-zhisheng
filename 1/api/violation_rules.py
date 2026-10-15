@@ -45,10 +45,13 @@ class ViolationRuleEngine:
         self.config = config or {}
         
         self.default_config = {
-            'confidence_threshold': 0.5,
+            # 2026-10-03 由 DSH 收紧：原值 0.5/0.3/0.4 过于宽松，导致几乎每帧都报违规
+            # （实测 80 秒 519 条），演示时满屏红框。提高后显著降低误报。
+            # 注意：这些是"本地规则判定"的置信度门槛，与云端咨询门槛（CONSULT_THRESHOLD）独立。
+            'confidence_threshold': 0.65,
             'max_park_duration_seconds': 300,
-            'helmet_confidence_threshold': 0.3,
-            'vehicle_confidence_threshold': 0.4
+            'helmet_confidence_threshold': 0.55,
+            'vehicle_confidence_threshold': 0.6
         }
         
         self.rules = {
@@ -124,6 +127,78 @@ class ViolationRuleEngine:
         c1 = self._get_bbox_center(bbox1)
         c2 = self._get_bbox_center(bbox2)
         return ((c1[0] - c2[0]) ** 2 + (c1[1] - c2[1]) ** 2) ** 0.5
+
+    # ------------------------------------------------------------------
+    # 多边形区域判定（2026-10-03 由 DSH 新增）
+    # 用于人工/自动标注的斑马线、禁停区等：不再依赖检测类，改用几何判定
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _point_in_polygon(px: float, py: float, polygon: List) -> bool:
+        """射线法判断点是否在多边形内（支持任意凸/凹多边形）
+
+        polygon: [[x1,y1],[x2,y2],...]  至少 3 个顶点
+        """
+        n = len(polygon)
+        if n < 3:
+            return False
+        inside = False
+        j = n - 1
+        for i in range(n):
+            try:
+                xi, yi = float(polygon[i][0]), float(polygon[i][1])
+                xj, yj = float(polygon[j][0]), float(polygon[j][1])
+            except (TypeError, ValueError, IndexError):
+                return False
+            if ((yi > py) != (yj > py)) and \
+                    (px < (xj - xi) * (py - yi) / ((yj - yi) or 1e-9) + xi):
+                inside = not inside
+            j = i
+        return inside
+
+    @staticmethod
+    def _polygon_bbox(polygon: List) -> tuple:
+        """多边形的轴对齐包围盒 (x1,y1,x2,y2)"""
+        xs, ys = [], []
+        for p in polygon or []:
+            try:
+                xs.append(float(p[0]))
+                ys.append(float(p[1]))
+            except (TypeError, ValueError, IndexError):
+                continue
+        if not xs:
+            return (0.0, 0.0, 0.0, 0.0)
+        return (min(xs), min(ys), max(xs), max(ys))
+
+    def _bbox_in_any_polygon(self, bbox: List[float], polygons: List,
+                             overlap_ratio: float = 0.25) -> bool:
+        """车辆框是否落在任一多边形区域内
+
+        判定（满足其一即算）：
+          1. 车辆框中心点落在多边形内（最常用、最直观）
+          2. 车辆框与多边形包围盒的重叠比例 >= overlap_ratio
+        """
+        if not polygons or len(bbox) < 4:
+            return False
+        cx, cy = self._get_bbox_center(bbox)
+        for poly in polygons:
+            if not poly:
+                continue
+            if self._point_in_polygon(cx, cy, poly):
+                return True
+            px1, py1, px2, py2 = self._polygon_bbox(poly)
+            if px2 <= px1 or py2 <= py1:
+                continue
+            # 包围盒重叠比例（以车辆框面积为分母）
+            ix1, iy1 = max(float(bbox[0]), px1), max(float(bbox[1]), py1)
+            ix2, iy2 = min(float(bbox[2]), px2), min(float(bbox[3]), py2)
+            if ix2 <= ix1 or iy2 <= iy1:
+                continue
+            inter = (ix2 - ix1) * (iy2 - iy1)
+            area = max(1.0, (float(bbox[2]) - float(bbox[0])) *
+                       (float(bbox[3]) - float(bbox[1])))
+            if inter / area >= overlap_ratio:
+                return True
+        return False
 
     def _bbox_overlap_ratio(self, bbox1: List[float], bbox2: List[float]) -> float:
         """计算两个bounding box的重叠比例"""
@@ -369,19 +444,51 @@ class ViolationRuleEngine:
                         if self._bbox_overlap_ratio(vehicle_bbox, crosswalk_bbox) > 0.1:
                             in_special_area = True
                             break
+
+            # ---- 人工/自动标注的斑马线多边形（2026-10-03 由 DSH 新增）----------
+            # 背景：原实现依赖 CROSSWALK_CLASSES 检测类，而 COCO 模型不输出该类
+            # （实测 0 检出），导致"斑马线违停"规则永远不生效。
+            # 方案（参考参考项目的"运行前人工标注"思路）：
+            #   scene_config['crosswalk_zones'] 存多边形顶点，用几何判定替代检测类：
+            #   - 车辆框中心落在多边形内            -> 违停
+            #   - 或车辆框与多边形包围盒重叠比例超限 -> 违停
+            if not in_special_area and scene_config:
+                zones = scene_config.get('crosswalk_zones') or []
+                for vehicle_det in vehicle_dets:
+                    bbox = vehicle_det.get('bbox', [0, 0, 0, 0])
+                    if self._bbox_in_any_polygon(bbox, zones, overlap_ratio=0.25):
+                        in_special_area = True
+                        break
+            # ------------------------------------------------------------------
             
             duration = scene_config.get('park_duration_seconds', 0) if scene_config else 0
             exceeds_duration = duration > max_duration
             
-            confidence = vehicle_conf * 0.4
-            if in_special_area:
+            # ---- 违停判定（2026-10-04 由 DSH 修正）------------------------
+            # 原实现：is_violation = in_special_area **or** is_no_parking_zone
+            #                     **or** exceeds_duration
+            #
+            # 三个严重问题：
+            #   ① 用 `or` -> 任一条件成立即判违规。而 is_no_parking_zone 是
+            #      **场景级全局标志**（"这个路口有没有禁停区"），与"这辆车是否
+            #      停在那里"无关 -> 只要场景配了禁停区，**路口所有车都被判违停**
+            #   ② 完全没有"车辆是否静止"的信息 -> 单帧无法区分"违停"与"路过"
+            #   ③ 默认 park_duration_seconds=0 时 exceeds_duration 恒 False，
+            #      进一步让时长维度失效
+            #
+            # 用户口径：「在不可停车区域内，速度约 0，持续 >5 秒 -> 判违停」。
+            # 静止判定在 behavior_engine.analyze_illegal_parking 里做（那里有轨迹），
+            # 本函数只有单帧，因此**必须要求停放时长**才判违规 —— 宁可漏报不可误报。
+            # ---------------------------------------------------------------
+            is_violation = bool(in_special_area and exceeds_duration)
+
+            if in_special_area and exceeds_duration:
                 confidence = min(vehicle_conf * 0.9, 0.95)
-            elif is_no_parking_zone:
-                confidence = min(vehicle_conf * 0.75, 0.9)
-            elif exceeds_duration:
-                confidence = min(vehicle_conf * 0.6, 0.85)
-            
-            is_violation = in_special_area or is_no_parking_zone or exceeds_duration
+            elif in_special_area:
+                # 在禁停区但时长不够 -> 不算违规（可能只是经过）
+                confidence = min(vehicle_conf * 0.4, 0.5)
+            else:
+                confidence = vehicle_conf * 0.3
             
             return {
                 'violation_type': 'illegal_parking',
@@ -556,7 +663,12 @@ class ViolationRuleEngine:
         
         try:
             from vehicle_tracker import vehicle_tracker
-            tracked_vehicles = vehicle_tracker.update(detections)
+            # ★2026-10-06 由 DSH 修正：原来不传 frame_width，用的是 tracker 默认
+            # **1280**，而本项目画面是 1920 -> 0.7*1280=896 的"对向车道"阈值严重偏左，
+            # 车在画面中右侧（x≈1200）也会被判在对向车道。
+            _fw = int((scene_config or {}).get('frame_width') or 0) or 1280
+            _fh = int((scene_config or {}).get('frame_height') or 0) or 720
+            tracked_vehicles = vehicle_tracker.update(detections, _fw, _fh)
             wrong_way_vehicles = vehicle_tracker.get_wrong_way_vehicles()
             
             vehicle_conf = self._get_max_confidence_for_classes(detections, VEHICLE_CLASSES)
@@ -753,13 +865,139 @@ class ViolationRuleEngine:
                 result = checker(detections, scene_config)
                 if result['is_violation']:
                     violations.append(result)
-        
+
+        # 统一回填 vehicle_id（2026-10-03 由 DSH 新增）
+        # 背景：规则引擎产生的违规原本**不带车辆 ID**，前端无法把违规与追踪
+        # 车辆对应（"违规车辆"栏永远空）。检测框在追踪后已被回填 track_id
+        # （见 realtime_detector._attach_track_ids），这里把该 ID 传进违规。
+        try:
+            self._attach_vehicle_ids(violations, detections)
+        except Exception:
+            pass
+
         return {
             'success': True,
             'violations': violations,
             'detection_summary': detection_summary,
             'message': f'规则引擎检查完成，检测到 {len(violations)} 个违规'
         }
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _attach_vehicle_ids(violations: List[Dict], detections: List[Dict]):
+        """给违规补充 vehicle_id / track_id（就近归属到车辆检测框）
+
+        归属优先级：
+          ① 违规自身已带 vehicle_id/track_id（如行为引擎产出）-> 保留
+          ② 违规 evidence 里的 bbox 与车辆检测框做 IoU
+          ③ 违规 location 点落在车辆框内
+          ④ 退化：全场仅一辆车 -> 直接归属
+        """
+        if not violations or not detections:
+            return
+        vehs = []
+        for d in detections:
+            if d.get('class_name') not in VEHICLE_CLASSES:
+                continue
+            tid = d.get('track_id', d.get('vehicle_id'))
+            bb = d.get('bbox') or []
+            if tid is None or len(bb) < 4:
+                continue
+            try:
+                vehs.append((int(tid), [float(v) for v in bb[:4]]))
+            except (TypeError, ValueError):
+                continue
+        if not vehs:
+            return
+        _valid = {tid for tid, _t in vehs}
+
+        for v in violations:
+            # 2026-10-03 由 DSH 修正：已带 ID 也要校验是否**仍在当前车辆集合**，
+            # 否则会保留失效旧 ID（实测行为引擎给的是上一批 track id，
+            # 导致违规永远挂不到当前车辆上）。失效则重新做几何归属。
+            _existing = v.get('vehicle_id', v.get('track_id'))
+            if _existing is not None:
+                try:
+                    if int(_existing) in _valid:
+                        continue
+                except (TypeError, ValueError):
+                    pass
+                v.pop('vehicle_id', None)
+                v.pop('track_id', None)
+            assigned = None
+            # ② evidence bbox IoU
+            for src in (v.get('evidence') or {}, v):
+                if not isinstance(src, dict):
+                    continue
+                bb = src.get('bbox') or src.get('target_bbox') or src.get('vehicle_bbox')
+                if isinstance(bb, (list, tuple)) and len(bb) >= 4:
+                    try:
+                        ax1, ay1, ax2, ay2 = [float(x) for x in bb[:4]]
+                    except (TypeError, ValueError):
+                        continue
+                    a_area = max(1.0, (ax2 - ax1) * (ay2 - ay1))
+                    best, best_iou = None, 0.0
+                    for tid, t in vehs:
+                        ix1, iy1 = max(ax1, t[0]), max(ay1, t[1])
+                        ix2, iy2 = min(ax2, t[2]), min(ay2, t[3])
+                        if ix2 <= ix1 or iy2 <= iy1:
+                            continue
+                        inter = (ix2 - ix1) * (iy2 - iy1)
+                        b_area = max(1.0, (t[2] - t[0]) * (t[3] - t[1]))
+                        iou = inter / (a_area + b_area - inter)
+                        if iou > best_iou:
+                            best, best_iou = tid, iou
+                    if best is not None and best_iou >= 0.2:
+                        assigned = best
+                        break
+            # ③ location 点包含（兼容 {'x','y'} 与 {'bbox','center_x','center_y'}）
+            if assigned is None:
+                loc = v.get('location')
+                if isinstance(loc, dict):
+                    px = py = None
+                    for kx, ky in (('x', 'y'), ('center_x', 'center_y'), ('cx', 'cy')):
+                        try:
+                            if loc.get(kx) is not None and loc.get(ky) is not None:
+                                px, py = float(loc[kx]), float(loc[ky])
+                                break
+                        except (TypeError, ValueError):
+                            continue
+                    if px is None:
+                        bb = loc.get('bbox') or loc.get('target_bbox')
+                        if isinstance(bb, (list, tuple)) and len(bb) >= 4:
+                            try:
+                                px = (float(bb[0]) + float(bb[2])) / 2.0
+                                py = (float(bb[1]) + float(bb[3])) / 2.0
+                            except (TypeError, ValueError):
+                                px = None
+                    if px is not None:
+                        for tid, t in vehs:
+                            if t[0] <= px <= t[2] and t[1] <= py <= t[3]:
+                                assigned = tid
+                                break
+            # ④ 不再"全场仅一辆车就归给它"（2026-10-03 由 DSH 修正）
+            # 原因：这会把"没有几何依据"的违规硬塞给唯一在场的车辆。
+            # 实测后果：红灯违规被归属到画面中央的卡车（它并未闯红灯），
+            # 正是"框在空地上/归属错误"的来源。无匹配宁可**留空**
+            # （前端会把它显示为"未归属告警"），也不编造归属。
+            if assigned is not None:
+                v['vehicle_id'] = assigned
+                v['track_id'] = assigned
+                # 同步更新 evidence 内的旧 ID（2026-10-03 由 DSH 修正）
+                # 否则路由层递归提取时会优先拿到 evidence 里的**失效旧 ID**，
+                # 把刚修好的归属又覆盖掉。
+                ev = v.get('evidence')
+                if isinstance(ev, dict):
+                    for val in ev.values():
+                        if isinstance(val, list):
+                            for item in val:
+                                if isinstance(item, dict):
+                                    for k in ('vehicle_id', 'track_id'):
+                                        if item.get(k) is not None:
+                                            try:
+                                                item[k] = assigned
+                                            except Exception:
+                                                pass
 
     def get_violation_types(self) -> List[Dict]:
         """获取所有支持的违规类型"""

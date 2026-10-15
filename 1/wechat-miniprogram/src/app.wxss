@@ -1,0 +1,97 @@
+/**
+ * 全局样式（2026-10-03 由 DSH 补齐）
+ *
+ * 背景：project.config.json 的 srcMiniprogramRoot 指向 src/，而 src/ 下
+ * 缺少 app.wxss，导致编译期缺少全局样式文件。此文件按项目的设计语言
+ * （智瞳蓝 #1D4ED8，与 web-admin 的 design-tokens 保持一致）提供基础样式。
+ */
+
+page {
+  background: #F5F7FA;
+  color: #1F2937;
+  font-size: 28rpx;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  line-height: 1.6;
+}
+
+/* ---------- 通用布局 ---------- */
+.container { padding: 24rpx; }
+.row { display: flex; align-items: center; }
+.row-between { display: flex; align-items: center; justify-content: space-between; }
+.col { display: flex; flex-direction: column; }
+.gap-8 { gap: 8rpx; }
+.gap-16 { gap: 16rpx; }
+.gap-24 { gap: 24rpx; }
+
+/* ---------- 卡片 ---------- */
+.card {
+  background: #FFFFFF;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(15, 23, 42, 0.06);
+}
+.card-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 16rpx;
+}
+
+/* ---------- 文本 ---------- */
+.text-primary { color: #1D4ED8; }
+.text-danger { color: #DC2626; }
+.text-success { color: #16A34A; }
+.text-warning { color: #D97706; }
+.text-muted { color: #8A9099; }
+.text-sm { font-size: 24rpx; }
+.text-lg { font-size: 34rpx; }
+.text-bold { font-weight: 600; }
+.mono { font-family: 'SF Mono', Consolas, monospace; }
+
+/* ---------- 徽标 ---------- */
+.badge {
+  display: inline-block;
+  padding: 2rpx 12rpx;
+  border-radius: 6rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+.badge-danger { background: #FEE2E2; color: #DC2626; }
+.badge-warning { background: #FEF3C7; color: #D97706; }
+.badge-success { background: #DCFCE7; color: #16A34A; }
+.badge-info { background: #DBEAFE; color: #1D4ED8; }
+
+/* 车牌样式（与 web-admin 一致） */
+.plate {
+  display: inline-block;
+  padding: 2rpx 12rpx;
+  border-radius: 4rpx;
+  background: #1D4ED8;
+  color: #FFFFFF;
+  font-family: 'SF Mono', Consolas, monospace;
+  font-size: 24rpx;
+  letter-spacing: 1rpx;
+}
+
+/* ---------- 按钮 ---------- */
+.btn {
+  padding: 20rpx 32rpx;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  text-align: center;
+}
+.btn-primary { background: #1D4ED8; color: #FFFFFF; }
+.btn-ghost { background: #FFFFFF; color: #1D4ED8; border: 2rpx solid #1D4ED8; }
+.btn-block { width: 100%; }
+
+/* ---------- 空态 ---------- */
+.empty {
+  padding: 80rpx 0;
+  text-align: center;
+  color: #8A9099;
+  font-size: 26rpx;
+}
+
+/* ---------- 分割线 ---------- */
+.divider { height: 2rpx; background: #EEF1F5; margin: 20rpx 0; }

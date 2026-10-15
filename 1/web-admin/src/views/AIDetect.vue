@@ -10,6 +10,21 @@
       <el-tabs v-model="activeTab" type="card">
         <el-tab-pane label="文件上传" name="upload">
           <div class="upload-section">
+            <!-- ★2026-10-06 由 DSH 改文案（用户反馈："不能上传很大的视频，这很不方便"）。
+                 事实：本页上传是"**提交一条违规证据**"，后端会跑 AI 分析并落库，
+                 且服务端有大小上限 —— 它**不是**用来测整段长视频的地方。
+                 要测试视频请去「实时监测」页按路径接入（不限大小、不复制文件）。 -->
+            <el-alert type="info" :closable="false" show-icon style="margin-bottom:14px">
+              <template #title>
+                本页用于「单张图片 / 短视频 → 跑一次 AI 分析并提交为一条违规证据」。
+                想<b>测试整段长视频</b>（几十 MB ~ 数 GB）请去
+                <el-link type="primary" :underline="false" @click="$router.push('/live')">
+                  实时监测页
+                </el-link>
+                —— 那里填绝对路径直接读原文件，<b>不限大小、不复制文件</b>。
+              </template>
+            </el-alert>
+
             <el-upload
               ref="uploadRef"
               :auto-upload="false"
@@ -25,7 +40,8 @@
               </div>
               <template #tip>
                 <div class="el-upload__tip">
-                  支持 jpg/jpeg/png 图片，mp4/avi 视频（建议小于 10MB）
+                  支持 jpg/jpeg/png 图片，mp4/avi 短视频（**上限 500MB**；
+                  超过请改用「实时监测」页按路径接入，那里不限大小）
                 </div>
               </template>
             </el-upload>
@@ -251,7 +267,26 @@
                 </div>
               </div>
               <div class="video-status-bar">
-                <span class="status-item">帧率: {{ statusData.current_fps.toFixed(1) }} FPS</span>
+                <span class="status-item" title="画面采集速率：成功读取帧的速率（与推理/推流节奏无关）。旧后端未上报时不显示数值">
+                  采集 FPS: {{ fmtFps(metrics.captureFps) }}
+                </span>
+                <span class="status-item" title="多模型推理实际完成速率（非画面帧率）">
+                  推理 FPS: {{ fmtFps(metrics.inferFps) }}{{ metrics.inferFpsLegacy ? '（均值）' : '' }}
+                </span>
+                <span
+                  v-if="metrics.hasAge"
+                  :class="['status-item', `age-${metrics.ageWarnLevel}`]"
+                  title="距最近一次推理完成的时间；越大说明画面上的检测结果越旧"
+                >
+                  推理年龄: {{ fmtAge(metrics.lastInferAgeMs) }}
+                </span>
+                <span
+                  v-if="metrics.hasDropped"
+                  :class="['status-item', { dropped: metrics.droppedTicks > 0 }]"
+                  title="因推理繁忙被整跳的检测节拍累计数（跳过后该节拍不产生新检测）"
+                >
+                  丢弃 tick: {{ metrics.droppedTicks }}
+                </span>
                 <span class="status-item">总帧数: {{ statusData.total_frames }}</span>
                 <span class="status-item">处理帧数: {{ statusData.processed_frames }}</span>
               </div>
@@ -274,8 +309,15 @@
                   <el-descriptions-item label="当前摄像头">
                     {{ selectedCameraIndex }}
                   </el-descriptions-item>
-                  <el-descriptions-item label="FPS">
-                    {{ statusData.current_fps.toFixed(1) }}
+                  <el-descriptions-item label="采集 FPS">
+                    <span title="画面采集速率（成功读取帧速率）；旧后端未上报时显示“未上报”，不虚构数值">
+                      {{ fmtFps(metrics.captureFps) }}
+                    </span>
+                  </el-descriptions-item>
+                  <el-descriptions-item label="推理 FPS">
+                    <span title="多模型推理完成速率（非画面帧率）；旧后端回退为窗口均值并标注">
+                      {{ fmtFps(metrics.inferFps) }}{{ metrics.inferFpsLegacy ? '（旧后端·窗口均值）' : '' }}
+                    </span>
                   </el-descriptions-item>
                   <el-descriptions-item label="总帧数">
                     {{ statusData.total_frames }}
@@ -287,6 +329,19 @@
                     <el-tag :type="statusData.violation_count > 0 ? 'danger' : 'info'">
                       {{ statusData.violation_count }}
                     </el-tag>
+                  </el-descriptions-item>
+                  <el-descriptions-item v-if="metrics.hasAge" label="最近推理年龄">
+                    <span :class="`age-text-${metrics.ageWarnLevel}`" title="距最近一次推理完成的时间">
+                      {{ fmtAge(metrics.lastInferAgeMs) }}
+                    </span>
+                  </el-descriptions-item>
+                  <el-descriptions-item v-if="metrics.hasDropped" label="丢弃 tick">
+                    <span :class="{ 'dropped-num': metrics.droppedTicks > 0 }" title="因推理繁忙被整跳的节拍累计数">
+                      {{ metrics.droppedTicks }}
+                    </span>
+                  </el-descriptions-item>
+                  <el-descriptions-item v-if="metrics.hasInferDuration" label="推理耗时">
+                    <span title="最近一次多模型 YOLO 推理耗时">{{ metrics.inferDurationMs.toFixed(0) }} ms</span>
                   </el-descriptions-item>
                 </el-descriptions>
               </el-card>
@@ -386,6 +441,49 @@ const statusData = ref({
   processing: false,
   cache_size: 0
 })
+
+// TASK-COORD-009B：采集 FPS / 推理 FPS 严格分离。
+// 只展示后端实际上报的数值：009A 新字段缺失（旧后端）时诚实显示“未上报”，
+// 推理 FPS 回退到旧字段 avg_fps 时明确标注“窗口均值”，绝不虚构采集速率。
+const metrics = computed(() => {
+  const s = statusData.value || {}
+  const num = v => (typeof v === 'number' && Number.isFinite(v)) ? v : null
+  const captureFps = num(s.capture_fps)
+  const inferFpsNew = num(s.infer_fps)
+  // 旧后端唯一可信的推理速率指标是 FPSMonitor 的 avg_fps（008A F5：current_fps 不可用，故不回退它）
+  const inferFpsLegacyVal = num(s.avg_fps)
+  const inferFps = inferFpsNew !== null ? inferFpsNew : inferFpsLegacyVal
+  const inferFpsLegacy = inferFpsNew === null && inferFpsLegacyVal !== null
+  const lastInferAgeMs = num(s.last_infer_age_ms)
+  const droppedTicks = num(s.dropped_ticks)
+  const inferDurationMs = num(s.infer_duration_ms)
+  let ageWarnLevel = 'ok'
+  if (lastInferAgeMs !== null) {
+    if (lastInferAgeMs >= 2000) ageWarnLevel = 'danger'
+    else if (lastInferAgeMs >= 1000) ageWarnLevel = 'warn'
+  }
+  return {
+    captureFps,
+    inferFps,
+    inferFpsLegacy,
+    lastInferAgeMs,
+    hasAge: lastInferAgeMs !== null,
+    droppedTicks,
+    hasDropped: droppedTicks !== null,
+    inferDurationMs,
+    hasInferDuration: inferDurationMs !== null,
+    ageWarnLevel
+  }
+})
+
+function fmtFps(v) {
+  return typeof v === 'number' && Number.isFinite(v) ? v.toFixed(1) : '—（未上报）'
+}
+
+function fmtAge(ms) {
+  if (typeof ms !== 'number' || !Number.isFinite(ms)) return '—'
+  return ms >= 1000 ? `${(ms / 1000).toFixed(2)} s` : `${ms.toFixed(0)} ms`
+}
 const consultResult = ref(null)
 
 let statusTimer = null
@@ -816,6 +914,21 @@ onUnmounted(() => {
 
         .status-item {
           font-weight: 500;
+
+          &.age-warn {
+            color: #b88230;
+            font-weight: 600;
+          }
+
+          &.age-danger {
+            color: #c45656;
+            font-weight: 600;
+          }
+
+          &.dropped {
+            color: #c45656;
+            font-weight: 600;
+          }
         }
       }
     }
@@ -839,6 +952,21 @@ onUnmounted(() => {
 
     .status-panel {
       margin-bottom: 20px;
+
+      .age-text-warn {
+        color: #b88230;
+        font-weight: 600;
+      }
+
+      .age-text-danger {
+        color: #c45656;
+        font-weight: 600;
+      }
+
+      .dropped-num {
+        color: #c45656;
+        font-weight: 600;
+      }
     }
 
     .consult-result {

@@ -12,6 +12,30 @@ from typing import List, Dict, Optional
 from dataclasses import dataclass
 
 
+def _point_in_polygon_local(px: float, py: float, polygon) -> bool:
+    """射线法判断点是否在多边形内（2026-10-03 由 DSH 新增）
+
+    为什么在本文件里重复实现：violation_rules 反向依赖 behavior_engine，
+    从本文件导入 ViolationRuleEngine 会形成循环依赖。此处保持自包含。
+    """
+    n = len(polygon) if polygon else 0
+    if n < 3:
+        return False
+    inside = False
+    j = n - 1
+    for i in range(n):
+        try:
+            xi, yi = float(polygon[i][0]), float(polygon[i][1])
+            xj, yj = float(polygon[j][0]), float(polygon[j][1])
+        except (TypeError, ValueError, IndexError):
+            return False
+        if ((yi > py) != (yj > py)) and \
+                (px < (xj - xi) * (py - yi) / ((yj - yi) or 1e-9) + xi):
+            inside = not inside
+        j = i
+    return inside
+
+
 @dataclass
 class BehaviorResult:
     behavior_type: str
@@ -38,12 +62,15 @@ BEHAVIOR_TYPE_CN = {
 class BehaviorEngine:
     def __init__(self, config: Optional[Dict] = None):
         self.config = config or {}
+        # 当前场景标注（含速度标定参数），由 analyze_all 注入；
+        # 默认空字典，避免未调用 analyze_all 时属性缺失（2026-10-03 由 DSH 新增）
+        self._scene = {}
         self.default_config = {
             'speed_limit': 60,
             'pixel_per_meter': 10,
             'stop_line_y': 400,
             'red_light_duration_threshold': 0.5,
-            'park_duration_threshold': 300,
+            'park_duration_threshold': 5,      # 秒（2026-10-04 由 DSH 改：300 -> 5，用户口径）
             'lane_width': 200,
             'confidence_threshold': 0.6,
             'min_trajectory_length': 5,
@@ -188,6 +215,21 @@ class BehaviorEngine:
         history = vehicle.get('history', [])
         track_id = vehicle.get('id', vehicle.get('track_id', 0))
 
+        # ★2026-10-06 由 DSH 新增：**静止/微动不判逆行**。
+        # 实测（演示视频）：停在停止线前等红灯的奥迪被每循环误报 1 次逆行。
+        # ⚠ 必须用**最近几个采样**判断"现在是否在动"：用整段 history 的净位移
+        #   是错的 —— 那辆车十几秒前开过 20 米然后再停下，净位移依然很大。
+        try:
+            pts = [h.get('center') for h in history[-4:] if h.get('center')]
+            moved = 0.0
+            for i in range(1, len(pts)):
+                moved = max(moved, ((pts[i][0] - pts[i - 1][0]) ** 2 +
+                                    (pts[i][1] - pts[i - 1][1]) ** 2) ** 0.5)
+            if len(pts) >= 2 and moved < 2.0:
+                direction = 'unknown'
+        except (KeyError, TypeError, ValueError, IndexError):
+            pass
+
         if direction == 'unknown':
             return BehaviorResult(
                 behavior_type='wrong_way',
@@ -212,10 +254,21 @@ class BehaviorEngine:
 
         is_wrong_direction = road_direction and direction in wrong_direction_map.get(road_direction, [])
 
-        if not is_wrong_direction and len(history) >= 5:
+        # ★2026-10-06 由 DSH 修正：这条"x_std 启发式"只在**道路横向穿过画面**时才有意义
+        #   （road_direction 为 left/right/east/west：车在画面一侧、横向压向对向车道）。
+        #   本演示机位是**纵深方向**（车朝画面里驶离），车辆因透视自然向左漂移
+        #   （实测 x 从 1550 -> 1306，x_std≈80px < 5%*1920=96px 于是通过筛选）
+        #   -> 刚合法越线的车被误判"逆行"，每循环 1 次、conf 0.9。
+        #   纵深机位下用"画面左右"推断车道方向本身不成立 —— 按"判不准就不判"处理。
+        _lateral_road = str(road_direction or '').lower() in ('left', 'right', 'east', 'west')
+        if not is_wrong_direction and _lateral_road and len(history) >= 5:
             features = self._extract_trajectory_features(history)
             x_std = features.get('x_std', 0)
-            frame_width = 1280
+            # 2026-10-06 由 DSH 修正：原来**硬编码 1280**，而本项目画面是 1920。
+            # 实测后果（演示视频 1920x1080）：正常行驶的蓝色轿车被判"逆行"
+            # （confidence 0.90、落库 id=2406），因为 0.7*1280=896 远小于车中心
+            # x≈1200；用真实画面宽 1920 时阈值为 1344，该误报自然消失。
+            frame_width = int((self._scene or {}).get('frame_width') or 0) or 1280
 
             if x_std < frame_width * 0.05:
                 avg_x = sum(h['center'][0] for h in history) / len(history)
@@ -280,29 +333,55 @@ class BehaviorEngine:
         features = self._extract_trajectory_features(history)
         avg_speed = features.get('avg_speed', 0)
         total_time = features.get('total_time', 0)
+        # ---- 违停判定（2026-10-04 由 DSH 重写，用户明确要求）--------------
+        # 用户口径：「在不可停车区域内，速度约 0 且持续 >5 秒 -> 判违停」
+        #
+        # 原实现的**严重问题**：
+        #   is_violation = in_no_parking_zone **or** exceeds_duration
+        #   ① 用了 `or` -> 只要车"在禁停区域内"就判违停，
+        #      于是**等红灯、堵车排队**的车全被误判（现场实测右栏频繁误报）。
+        #   ② 时长阈值默认 300 秒（5 分钟），使时长维度形同虚设。
+        #
+        # 现改为**三个条件同时成立**（and）：
+        #   在禁停区域内 且 速度≈0 且 持续 >= park_duration_threshold 秒
+        # 阈值同步调为 5 秒（用户指定）。
+        # -------------------------------------------------------------------
         is_stationary = avg_speed < self._get_config('stationary_threshold', 1.5)
-
         if is_stationary:
-            max_duration = self._get_config('park_duration_threshold', 300)
+            max_duration = self._get_config('park_duration_threshold', 5)
 
             in_no_parking_zone = False
             center = vehicle.get('center', (0, 0))
-            for zone in no_parking_zones:
-                if zone.get('x1', 0) < center[0] < zone.get('x2', float('inf')) and \
-                   zone.get('y1', 0) < center[1] < zone.get('y2', float('inf')):
-                    in_no_parking_zone = True
-                    break
+            for zone in no_parking_zones or []:
+                # 兼容两种禁停区格式（2026-10-03 由 DSH 修复）：
+                #   ① {'x1','y1','x2','y2'}
+                #   ② 多边形顶点 [[x,y],...]（人工标注格式，见 /api/scene）
+                if isinstance(zone, dict):
+                    if zone.get('x1', 0) < center[0] < zone.get('x2', float('inf')) and \
+                       zone.get('y1', 0) < center[1] < zone.get('y2', float('inf')):
+                        in_no_parking_zone = True
+                        break
+                elif isinstance(zone, (list, tuple)) and len(zone) >= 3:
+                    try:
+                        if _point_in_polygon_local(center[0], center[1], zone):
+                            in_no_parking_zone = True
+                            break
+                    except Exception:
+                        continue
 
-            exceeds_duration = total_time > max_duration
-            is_violation = in_no_parking_zone or exceeds_duration
+            exceeds_duration = total_time >= max_duration
+            # 关键修复：必须"在禁停区域" **且** "停放够久" 才算违停
+            is_violation = bool(in_no_parking_zone and exceeds_duration)
 
-            confidence = 0.3
+            # 置信度分级
             if in_no_parking_zone and exceeds_duration:
                 confidence = 0.95
             elif in_no_parking_zone:
-                confidence = 0.7
-            elif exceeds_duration:
-                confidence = 0.6
+                # 在禁停区域但时间还不够 -> 不算违规（可能只是缓慢通过）
+                confidence = 0.35
+            else:
+                # 停得久但不在禁停区域 -> 正常停车/等红灯，不算违规
+                confidence = 0.2
 
             return BehaviorResult(
                 behavior_type='illegal_parking',
@@ -337,14 +416,66 @@ class BehaviorEngine:
         track_id = vehicle.get('id', vehicle.get('track_id', 0))
 
         speed_limit = self._get_config('speed_limit', 60)
-        pixel_per_meter = self._get_config('pixel_per_meter', 10)
 
         features = self._extract_trajectory_features(history) if history else {}
         avg_speed = features.get('avg_speed', speed)
         max_speed = features.get('max_speed', speed)
-
         real_speed_pixels = max(avg_speed, max_speed)
-        real_speed_kmh = real_speed_pixels * 3.6 / pixel_per_meter
+
+        # 测速换算（2026-10-03 由 DSH 重写）
+        # 原实现：real_speed_kmh = px * 3.6 / pixel_per_meter，
+        #   而 pixel_per_meter 来自 _get_config 默认值 10，**与场景标注标定无关**
+        #   -> 无论怎么标定，超速判定都用同一个魔数，标定形同虚设。
+        # 现改为用 SpeedCalibrator（含透视校正 + 标定来源/置信度）。
+        real_speed_kmh = 0.0
+        calib_method, calib_conf, calib_note = 'assumed_lanes', 'assumed', ''
+        try:
+            from speed_calibration import SpeedCalibrator, speed_from_history
+            scene = self._scene or {}
+            W = int(scene.get('frame_width') or 0)
+            H = int(scene.get('frame_height') or 0)
+            if not W or not H:
+                # 无画面尺寸时用 bbox 推断（够用：只影响透视外推精度）
+                bb = vehicle.get('bbox') or []
+                W = W or (int(bb[2]) * 2 if len(bb) >= 4 else 1280)
+                H = H or (int(bb[3]) * 2 if len(bb) >= 4 else 576)
+            cal = SpeedCalibrator(scene, frame_width=W, frame_height=H)
+            est = speed_from_history(history, cal) if history else {}
+            real_speed_kmh = float(est.get('kmh') or 0.0)
+            calib_method = est.get('method') or cal.method
+            calib_conf = est.get('confidence') or cal.method
+            calib_note = est.get('note') or cal.note
+            if real_speed_kmh <= 0:
+                # 轨迹不足时退回单点换算（明确标注为粗估）
+                cy = 0.5 * H
+                real_speed_kmh = cal.px_speed_to_kmh(real_speed_pixels, cy)
+        except Exception:
+            # 兜底：仍用旧公式，但标记为未标定
+            real_speed_kmh = real_speed_pixels * 3.6 / max(1.0, self._get_config('pixel_per_meter', 10))
+
+        # 置信度门禁（2026-10-03 由 DSH 新增）
+        # 无标定时 ppm 误差可达 ±50%，据此判定"超速"不可靠，也违背本项目
+        # "AI 不作仲裁者"的红线。故 allow_uncalibrated_speeding 默认 False：
+        # 未标定 -> 只记录证据、不判违规（前端仍能看到估算速度，但不告警）。
+        if str(calib_conf).startswith('assumed') or str(calib_method).startswith('assumed'):
+            if not self._get_config('allow_uncalibrated_speeding', False):
+                return BehaviorResult(
+                    behavior_type='speeding',
+                    behavior_type_cn=BEHAVIOR_TYPE_CN['speeding'],
+                    confidence=0.0,
+                    is_violation=False,
+                    evidence={
+                        'skipped': 'uncalibrated',
+                        'pixel_speed': round(real_speed_pixels, 2),
+                        'estimated_kmh': round(real_speed_kmh, 2),
+                        'speed_limit': speed_limit,
+                        'calibration': calib_method,
+                        'confidence': calib_conf,
+                        'note': calib_note or '未标定，超速判定已跳过（请标注一条车道线以启用）',
+                    },
+                    vehicle_id=track_id,
+                    timestamp=datetime.now().isoformat()
+                )
 
         if real_speed_kmh > speed_limit:
             excess_ratio = (real_speed_kmh - speed_limit) / speed_limit
@@ -361,7 +492,9 @@ class BehaviorEngine:
                     'speed_limit': speed_limit,
                     'excess_ratio': round(excess_ratio, 2),
                     'avg_speed': round(avg_speed, 2),
-                    'max_speed': round(max_speed, 2)
+                    'max_speed': round(max_speed, 2),
+                    'calibration': calib_method,
+                    'calibration_confidence': calib_conf,
                 },
                 vehicle_id=track_id,
                 timestamp=datetime.now().isoformat()
@@ -383,13 +516,37 @@ class BehaviorEngine:
 
         overlap_count = 0
         overlap_details = []
-        for lane in lane_lines:
-            lane_bbox = lane.get('bbox', [0, 0, 0, 0])
+        for lane in lane_lines or []:
+            # 兼容两种车道线格式（2026-10-03 由 DSH 修复）：
+            #   ① 检测类格式：{'bbox': [x1,y1,x2,y2], 'class_name': ...}
+            #   ② 人工标注格式：[[x1,y1],[x2,y2]]  （线段两端点，见 /api/scene）
+            # 原实现只支持 ①，人工标注的 ②（list）会抛
+            #   AttributeError: 'list' object has no attribute 'get'
+            # 导致行为分析整体失败（实测每帧每车都报错）。
+            lane_bbox = None
+            lane_type = 'annotated'
+            if isinstance(lane, dict):
+                lane_bbox = lane.get('bbox', [0, 0, 0, 0])
+                lane_type = lane.get('class_name', 'unknown')
+            elif isinstance(lane, (list, tuple)) and len(lane) >= 2:
+                try:
+                    (ax, ay), (bx, by) = lane[0], lane[1]
+                    # 线段转轴对齐包围盒；宽度留少量容差，避免退化成零面积
+                    x1, x2 = sorted([float(ax), float(bx)])
+                    y1, y2 = sorted([float(ay), float(by)])
+                    lane_bbox = [x1, y1, x2, y2]
+                except (TypeError, ValueError, IndexError):
+                    continue
+            else:
+                continue
+            if not lane_bbox or len(lane_bbox) < 4:
+                continue
+
             overlap_ratio = self._bbox_overlap(bbox, lane_bbox)
             if overlap_ratio > self._get_config('overlap_threshold', 0.1):
                 overlap_count += 1
                 overlap_details.append({
-                    'lane_type': lane.get('class_name', 'unknown'),
+                    'lane_type': lane_type,
                     'overlap_ratio': round(overlap_ratio, 4),
                     'lane_bbox': lane_bbox
                 })
@@ -442,7 +599,22 @@ class BehaviorEngine:
         below_stop_line = any(c[1] > stop_line_y for c in centers)
         above_stop_line = any(c[1] < stop_line_y for c in centers)
 
-        if traffic_light_state == 'yellow' and below_stop_line and above_stop_line:
+        # ★2026-10-06 由 DSH 修正：**越线必须发生在"最近几个采样内"**。
+        # 原判据只看"历史窗口里是否同时存在线前/线后的点"，而 tracker 的历史
+        # 长达十几秒 -> 车辆**绿灯时合法通过**后，等灯变黄仍会被判"抢黄灯"
+        # （演示视频实测：奥迪 t=15.10s 绿灯越线，t≈20s 黄灯亮起时被误报）。
+        # 现在要求"穿越停止线那一帧"落在最近 6 个采样内（3fps 下约 2 秒），
+        # 即车辆**正在**越线，而不是"曾经"越线。
+        cross_idx = None
+        for i in range(1, len(centers)):
+            if centers[i - 1][1] > stop_line_y >= centers[i][1]:
+                cross_idx = i
+                break
+        crossing_recent = (cross_idx is not None
+                           and (len(centers) - cross_idx) <= 6)
+
+        if traffic_light_state == 'yellow' and crossing_recent and below_stop_line \
+                and above_stop_line:
             features = self._extract_trajectory_features(history)
             avg_speed = features.get('avg_speed', 0)
 
@@ -478,6 +650,9 @@ class BehaviorEngine:
         results = []
 
         scene_config = scene_config or {}
+        # 供 analyze_speeding 读取标定参数（2026-10-03 由 DSH 新增）
+        # analyze_speeding 的签名不含 scene_config，用实例属性传递。
+        self._scene = scene_config
 
         red_light_result = self.analyze_red_light(
             vehicle,
@@ -519,6 +694,25 @@ class BehaviorEngine:
         )
         if running_yellow_result.is_violation:
             results.append(running_yellow_result)
+
+        # 统一注入 vehicle_id（2026-10-03 由 DSH 新增）
+        # 背景：BehaviorResult 本来就有 vehicle_id 字段，但各 analyze_* 方法
+        # 从未填充它 -> 行为引擎产出的违规在实时链路上**没有车辆归属**
+        # （实测 speeding / illegal_parking 全部落入"未归属"，前端右栏恒空）。
+        # analyze_all 手上有 vehicle 对象，此处是唯一能可靠拿到 ID 的位置；
+        # 源头写 ID 比事后按几何猜测可靠得多。
+        try:
+            vid = vehicle.get('id', vehicle.get('track_id', vehicle.get('vehicle_id')))
+            if vid is not None:
+                vid = int(vid)
+                for r in results:
+                    if not getattr(r, 'vehicle_id', None):
+                        r.vehicle_id = vid
+                    # evidence 里也补一份，便于下游/前端排查
+                    if isinstance(getattr(r, 'evidence', None), dict):
+                        r.evidence.setdefault('vehicle_id', vid)
+        except (TypeError, ValueError, AttributeError):
+            pass
 
         return results
 

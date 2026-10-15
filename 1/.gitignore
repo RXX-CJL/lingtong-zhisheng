@@ -61,6 +61,13 @@ api/config_runtime.json
 .env.*
 !.env.example
 *.secret
+# 备份/临时副本可能含明文密钥，一律忽略（2026-09-27 补充）
+*.bak
+*.bak-*
+*.backup
+*.orig
+*_backup.json
+*config_runtime*.bak*
 
 # --- IDE / 编辑器 ---
 .vscode/

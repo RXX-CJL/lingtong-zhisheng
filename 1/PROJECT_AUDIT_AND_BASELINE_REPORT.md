@@ -318,7 +318,11 @@ python main.py
 | P1-3 | 两套小程序目录并存 | 边界不清晰 |
 | P1-4 | `beforeness/` 实验目录 | 用途不明 |
 | P1-5 | 5份 `yolov8n.pt` 重复 | 存储浪费,可能加载错误副本 |
-| P1-6 | `cloud_collaborator.py` 参数错位 (B1/B2) | `analyze_with_claude` 3参数调2参数函数 |
+| P1-6 | ~~`cloud_collaborator.py` 参数错位 (B1/B2)~~ **✅ 已修复（2026-09-27 复核）** | ~~`analyze_with_claude` 3参数调2参数函数~~ 现两处调用均已按真实签名对齐 |
+
+> **P1-6 状态更正（2026-09-27，由 DSH 复核）**：本报告此前把 B1/B2 列为未修复，属**文档滞后**。
+> 实测：`cloud_collaborator.py:784` 与 `:823` 已按真实签名对齐（`analyze_with_claude(image_input, violation_type, context_prompt='')`；`analyze_with_deepseek_judge(violation_type, yolo_result_dict, doubao_result_dict)`），优雅降级保留。
+> 证据：`E:\output\_TASK-COORD-002-DSH_OUTPUT.json`、校验脚本 `_b12_verify.py` → PASS 17 / FAIL 0。
 
 ### P2 — 后续优化
 

@@ -30,10 +30,16 @@ import sys
 import unittest
 from unittest.mock import patch
 
+import numpy as np
+from types import SimpleNamespace
+from unittest.mock import Mock
+
 # 将 api 目录加入 sys.path（与仓库其他测试一致）
 API_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'api')
 if API_DIR not in sys.path:
     sys.path.insert(0, API_DIR)
+
+import image_recognizer
 
 from cloud_collaborator import CloudCollaborator  # noqa: E402
 
@@ -91,6 +97,115 @@ class TestEventCloudArbitration(unittest.TestCase):
             vehicle_info=self.vehicle_info, scene_context=self.scene_context,
             event_type='red_light', trajectory=self.trajectory,
         )
+
+    def test_representative_frames_are_sampled_across_clip(self):
+        """空的显式关键帧列表时，必须从整段事件视频均匀抽样，而非只取开头。"""
+        clip = [(float(i), np.full((8, 12, 3), i, dtype=np.uint8)) for i in range(10)]
+        selected = self.collab._select_representative_frames(clip, [], max_count=5)
+        self.assertEqual([int(frame[0, 0, 0]) for frame in selected], [0, 2, 4, 6, 8])
+
+    def test_doubao_uncertain_parse_is_not_negative(self):
+        """豆包输出【不确定】时解析结果必须保留三态信息，且完全不联网。"""
+        content = '\n'.join(['第二步·是否违规：【不确定】', '第四步·置信度评分：20'])
+        response = SimpleNamespace(
+            status_code=200,
+            output=SimpleNamespace(choices=[SimpleNamespace(
+                message=SimpleNamespace(content=[{'text': content}]))]))
+        fake_sdk = SimpleNamespace(api_key='', MultiModalConversation=SimpleNamespace(
+            call=Mock(return_value=response)))
+        with (
+            patch.object(image_recognizer, 'DASHSCOPE_AVAILABLE', True),
+            patch.object(image_recognizer, 'dashscope', fake_sdk, create=True),
+            patch.object(image_recognizer, '_get_dashscope_key', return_value='fake-key'),
+        ):
+            result = image_recognizer.analyze_with_doubao('a' * 40, 'red_light')
+        self.assertTrue(result['success'])
+        self.assertFalse(result['is_violation_confirmed'])
+        self.assertTrue(result['is_uncertain'])
+
+    def test_deepseek_uncertain_parse_is_not_negative(self):
+        """DeepSeek 的“无法确定·需人工”不能被压成普通否定。"""
+        content = '\n'.join(['第三步·你的独立判断：【无法确定·需人工】', '第四步·置信度：20', '第五步·风险评估：【中风险】'])
+        response = SimpleNamespace(status_code=200, json=lambda: {
+            'choices': [{'message': {'content': content}}]})
+        with (
+            patch.object(image_recognizer, '_get_deepseek_key', return_value='fake-key'),
+            patch('requests.post', return_value=response),
+        ):
+            result = image_recognizer.analyze_with_deepseek_judge('red_light', {}, dict(DOUBAO_REAL))
+        self.assertTrue(result['success'])
+        self.assertFalse(result['is_violation_confirmed'])
+        self.assertTrue(result['is_uncertain'])
+
+    def test_contact_sheet_contains_multiple_frames_without_network(self):
+        """多帧拼图在本地生成，不需要任何云端 API。"""
+        frames = [np.full((90, 160, 3), i * 20, dtype=np.uint8) for i in range(5)]
+        sheet = self.collab._compose_event_contact_sheet(frames)
+        self.assertIsNotNone(sheet)
+        self.assertEqual(tuple(sheet.shape), (1080, 1280, 3))
+
+    def test_doubao_receives_contact_sheet_in_one_mocked_call(self):
+        """事件视觉调用实际收到拼图，且本地验证不触发网络或额外调用。"""
+        import base64
+        import cv2
+
+        frames = [np.full((90, 160, 3), i * 20, dtype=np.uint8) for i in range(5)]
+        with patch('image_recognizer.analyze_with_doubao', autospec=True) as mock_doubao:
+            mock_doubao.return_value = dict(DOUBAO_REAL)
+            result = self.collab._analyze_event_with_doubao(frames, 'red_light', 'test context')
+
+        self.assertTrue(result['success'])
+        self.assertEqual(mock_doubao.call_count, 1)
+        payload = mock_doubao.call_args.args[0]
+        encoded = payload.split(',', 1)[1] if payload.startswith('data:image') else payload
+        decoded = cv2.imdecode(np.frombuffer(base64.b64decode(encoded), np.uint8), cv2.IMREAD_COLOR)
+        self.assertIsNotNone(decoded)
+        self.assertEqual(tuple(decoded.shape), (1080, 1280, 3))
+
+    def test_failed_primary_visual_skips_paid_deepseek_call(self):
+        """主视觉模型失败时跳过无效二审，避免对空内容再产生一次付费调用。"""
+        failed = {'success': False, 'message': 'mock provider failure', 'result_text': ''}
+        with patch('image_recognizer.analyze_with_deepseek_judge', autospec=True) as mock_judge:
+            result = self.collab._analyze_event_with_deepseek(
+                failed, {}, 'red_light', 'test context', {'confidence': 0.5}
+            )
+        self.assertFalse(result['success'])
+        self.assertIn('mock provider failure', result['result_text'])
+        mock_judge.assert_not_called()
+
+    def test_ai_trace_preserves_provider_failure_reason(self):
+        """前端应能看到视觉模型 unavailable 的原因，而不是只有空 reasoning。"""
+        trace = self.collab.build_ai_trace(
+            {'violation_type': 'red_light'},
+            {'success': False, 'message': 'mock HTTP 401', 'confidence_adjusted': 0.0},
+            {'success': False, 'message': 'skipped because primary failed', 'result_text': 'skipped'},
+            {'judgment': 'uncertain', 'confidence': 0.0, 'method': 'local_fallback', 'evidence_count': 1},
+        )
+        self.assertFalse(trace['doubao']['success'])
+        self.assertEqual(trace['doubao']['message'], 'mock HTTP 401')
+        self.assertFalse(trace['deepseek']['success'])
+        self.assertIn('skipped', trace['deepseek']['message'])
+    def test_uncertain_visual_evidence_goes_to_manual_review(self):
+        """模型明确表示不确定时，不得把 False 布尔值误当成已证实的“不违规”。"""
+        doubao = dict(DOUBAO_REAL, is_violation_confirmed=False, is_uncertain=True,
+                      confidence_adjusted=0.2)
+        deepseek = dict(DEEPSEEK_REAL, is_violation_confirmed=False, is_uncertain=True,
+                        confidence_adjusted=0.2)
+        final = self.collab._build_event_final_judgment(doubao, {}, deepseek, 'red_light')
+        self.assertEqual(final['judgment'], 'uncertain')
+        self.assertTrue(final['pending_review'])
+
+    def test_uncertain_second_opinion_does_not_auto_reject(self):
+        """主视觉模型确认但二审无法确定时，应人工复核而不是直接排除。"""
+        doubao = dict(DOUBAO_REAL, is_violation_confirmed=True, is_uncertain=False,
+                      confidence_adjusted=0.9)
+        deepseek = dict(DEEPSEEK_REAL, is_violation_confirmed=False, is_uncertain=True,
+                        confidence_adjusted=0.2)
+        final = self.collab._build_event_final_judgment(doubao, {}, deepseek, 'red_light')
+        self.assertEqual(final['judgment'], 'uncertain')
+        self.assertTrue(final['pending_review'])
+
+
 
     def _run_happy_path(self):
         """在三个云端函数被 autospec mock 的场景下跑一次 analyze_event"""
@@ -162,6 +277,8 @@ class TestEventCloudArbitration(unittest.TestCase):
         self.assertEqual(trace.get('version'), 'v3')
         self.assertIn('final', trace)
         self.assertNotEqual(trace['final'].get('judgment', ''), '')
+        self.assertEqual(trace['final']['judgment'], 'uncertain',
+                         '云端调用失败不能把本地疑似事件自动确认或排除')
 
 
 if __name__ == '__main__':

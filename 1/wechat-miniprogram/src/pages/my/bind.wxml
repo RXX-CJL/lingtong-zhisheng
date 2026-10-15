@@ -1,0 +1,53 @@
+<!-- 车辆绑定页（2026-10-03 由 DSH 新增） -->
+<view class="container">
+
+  <!-- 说明 -->
+  <view class="tip-card">
+    <view class="tip-title">为什么要绑定车辆？</view>
+    <view class="tip-text">绑定后，系统识别到你的车牌有违规时，会自动给你发通知，你也能在此查看违规证据并发起申诉。</view>
+  </view>
+
+  <!-- 已绑定车辆 -->
+  <view class="card">
+    <view class="card-title">我的车辆（{{myVehicles.length}}）</view>
+    <view wx:if="{{myVehicles.length === 0}}" class="empty">还未绑定车辆</view>
+    <view class="veh-row" wx:for="{{myVehicles}}" wx:key="plate_number">
+      <view class="veh-left">
+        <text class="plate">{{item.plate_number}}</text>
+        <text class="veh-meta">{{item.relation === 'owner' ? '本人车辆' : item.relation}} · 已验证</text>
+      </view>
+      <view class="veh-unbind" bindtap="onUnbind" data-plate="{{item.plate_number}}">解绑</view>
+    </view>
+  </view>
+
+  <!-- 建议车牌（系统识别到过的） -->
+  <view class="card" wx:if="{{suggestPlates.length > 0}}">
+    <view class="card-title">系统识别到过的车牌（点击即可绑定）</view>
+    <view class="suggest-tip">这些车牌来自近期抓拍记录，演示时可直接点选</view>
+    <view class="suggest-wrap">
+      <view class="suggest-item" wx:for="{{suggestPlates}}" wx:key="plate_number"
+            bindtap="onBindSuggest" data-plate="{{item.plate_number}}">
+        <text class="suggest-plate">{{item.plate_number}}</text>
+        <text class="suggest-count">{{item.count}} 条记录</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 手动输入 -->
+  <view class="card">
+    <view class="card-title">手动输入车牌</view>
+    <view class="manual-row">
+      <input class="manual-input" placeholder="例如 沪1X1111" maxlength="10"
+             value="{{manualPlate}}" bindinput="onPlateInput" />
+      <view class="btn btn-primary manual-btn" bindtap="onBindManual">绑定</view>
+    </view>
+    <view class="manual-tip">提示：手动绑定不校验车牌是否在系统记录中</view>
+  </view>
+
+  <!-- 下一步 -->
+  <view class="next-card" wx:if="{{hasBinding}}">
+    <view class="next-text">已绑定车辆，去查看我的违规记录</view>
+    <view class="btn btn-ghost" bindtap="goAppeal">查看申诉进度</view>
+  </view>
+
+</view>

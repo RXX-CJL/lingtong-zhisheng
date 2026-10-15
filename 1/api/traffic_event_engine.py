@@ -33,6 +33,16 @@ from datetime import datetime
 logger = logging.getLogger("traffic_event_engine")
 
 
+def wall_time_to_datetime(wall_time):
+    """Convert a trusted Unix wall-clock timestamp; never pass source-video-relative time here."""
+    if wall_time in (None, 0, "", False):
+        return None
+    try:
+        return datetime.fromtimestamp(float(wall_time))
+    except (TypeError, ValueError, OSError, OverflowError):
+        return None
+
+
 # ==========================================================================
 # EventState 枚举（GPT §7 的 8 状态）
 # ==========================================================================
@@ -54,7 +64,8 @@ VALID_TRANSITIONS: Dict[EventState, List[EventState]] = {
     EventState.DETECTING: [EventState.TRIGGERED],
     EventState.TRIGGERED: [EventState.RECORDING, EventState.REJECTED],  # 允许直接排除（误触）
     EventState.RECORDING: [EventState.PENDING_AI, EventState.REJECTED],  # 录制中也可放弃
-    EventState.PENDING_AI: [EventState.AI_REVIEWED],
+    # 云端请求失败时允许明确转人工复核，避免事件永久停留在 pending_ai。
+    EventState.PENDING_AI: [EventState.AI_REVIEWED, EventState.MANUAL_REVIEW],
     EventState.AI_REVIEWED: [EventState.CONFIRMED, EventState.REJECTED, EventState.MANUAL_REVIEW],
     EventState.MANUAL_REVIEW: [EventState.CONFIRMED, EventState.REJECTED],
     EventState.CONFIRMED: [],   # 终态
@@ -83,6 +94,20 @@ class TrafficEvent:
 
     # 时间信息
     trigger_time: float = 0.0          # 触发时间戳
+    # ★★2026-10-10 由 DSH 新增：**墙钟时间**（秒，time.time()），与 trigger_time 分开。
+    #
+    # 为什么必须分开：
+    #   `trigger_time` 现在装的是**视频时间**（回放本地视频时由 realtime_detector._now()
+    #   给出，(frame_count - 循环基准)/源fps），它的用途是"**在帧缓存里定位关键帧**"
+    #   —— 必须和帧缓存的时间戳同源，这一点没错。
+    #   但它**不是** Unix 时间戳，不能拿去当墙上时间用。
+    #   原实现落库时直接 `datetime.fromtimestamp(trigger_time)`：
+    #     · trigger_time=10.95（视频第 10.95 秒）-> **1970-01-01 08:00:10**
+    #       （实测：本轮事件表里真的出现了这种 1970 行）
+    #     · trigger_time 为负（基准脱节时）-> fromtimestamp 抛 OSError ->
+    #       被 except 兜成 datetime.now() -> **看起来正常，其实是巧合**
+    #   前端/小程序展示的是"违规发生时间"，必须是**真实墙上时间**。
+    wall_time: float = 0.0             # 真实墙上时间（time.time()）
     created_at: str = ""               # 创建时间 ISO8601
     updated_at: str = ""               # 更新时间 ISO8601
 
@@ -109,6 +134,10 @@ class TrafficEvent:
             self.event_id = f"evt_{int(time.time()*1000)}_{uuid.uuid4().hex[:8]}"
         if not self.trigger_time:
             self.trigger_time = time.time()
+        # ★2026-10-10：墙钟单独记一份（调用方通常已经显式传了本地视频时间给
+        #   trigger_time，此时这里补的是"违规真实发生的那一刻"）
+        if not self.wall_time:
+            self.wall_time = time.time()
         if not self.created_at:
             self.created_at = datetime.now().isoformat()
         if not self.updated_at:
@@ -129,6 +158,7 @@ class TrafficEvent:
             'track_id': self.track_id,
             'state': self.state.value,
             'trigger_time': self.trigger_time,
+            'wall_time': self.wall_time,
             'created_at': self.created_at,
             'updated_at': self.updated_at,
             'vehicle_info': self.vehicle_info,
@@ -161,24 +191,63 @@ class TrafficEventEngine:
 
     def __init__(self, rule_plugins: Optional[List] = None,
                  frame_buffer=None,
-                 cooldown_sec: int = 60):
+                 cooldown_sec: int = 60,
+                 clock=None):
         """初始化事件引擎
 
         Args:
             rule_plugins: 规则插件列表（从 PluginLoader 加载），None 表示无插件
             frame_buffer: CircularFrameBuffer 实例（用于事件视频提取）
             cooldown_sec: 同车同类型事件冷却秒数（默认 60s）
+            clock: **可注入时钟**（返回秒数的无参可调用对象）。
+
+                ★2026-10-06 由 DSH 新增。默认 None = 用墙钟 `time.time()`，
+                **接真实摄像头时行为完全不变**。
+
+                为什么要注入：**回放本地视频时，墙钟与视频时间不是一回事**。
+                检测慢于视频（实测 2.66 fps vs 源 20 fps，慢 ~7.5 倍），
+                于是一个"前后 5 秒"的事件片段窗口按墙钟取，实际会取到
+                **视频里 80 秒之后**的帧 —— 证据里车早就开走了。
+                实测 AI 复核因此判"画面中无任何车辆"，
+                所有违规都被 REJECTED（trigger_time 与帧缓存时间戳不同源）。
+
+                回放视频时应传入"视频时间"（帧号/源帧率），
+                并且**每循环一圈把视频时间归零**，既保证窗口对齐，
+                也让"同一违规每圈只报一次"成立。
         """
         self.rule_plugins = rule_plugins or []
         self.frame_buffer = frame_buffer
         self.cooldown_sec = cooldown_sec
+        self._clock = clock
         # 事件存储：event_id → TrafficEvent
         self._events: Dict[str, TrafficEvent] = {}
         # 冷却记录：(track_id, event_type) → cooldown_until 时间戳
         self._cooldowns: Dict[tuple, float] = {}
         self._lock = threading.Lock()
         logger.info(f"[TrafficEventEngine] 初始化: plugins={len(self.rule_plugins)} "
-                    f"frame_buffer={'有' if frame_buffer else '无'} cooldown={cooldown_sec}s")
+                    f"frame_buffer={'有' if frame_buffer else '无'} cooldown={cooldown_sec}s "
+                    f"clock={'注入' if clock else '墙钟'}")
+
+    def set_clock(self, clock):
+        """替换时钟（供 realtime_detector 按数据源类型注入）。
+
+        传 None 恢复墙钟。
+        """
+        self._clock = clock
+        logger.info(f"[TrafficEventEngine] 时钟已切换为 {'注入时钟' if clock else '墙钟'}")
+
+    def _now(self) -> float:
+        """当前时间（默认墙钟；注入了就用注入的）。
+
+        **引擎内所有时间比较必须走这里**，否则会出现"用视频时间创建事件、
+        却用墙钟判断冷却"的混用（曾因此导致冷却失效、事件重复触发）。
+        """
+        if self._clock is not None:
+            try:
+                return float(self._clock())
+            except Exception:
+                pass
+        return time.time()
 
     def process_frame(self, frame, detections: List, tracked_vehicles: Dict,
                       scene_context: Dict) -> List[TrafficEvent]:
@@ -234,12 +303,32 @@ class TrafficEventEngine:
                               violation) -> Dict[str, Any]:
         """从跟踪车辆字典提取车辆信息"""
         v_info = tracked_vehicles.get(track_id, {}) if isinstance(tracked_vehicles, dict) else {}
+
+        # speed/direction 在上游可能是字符串（如 '85.6 km/h'），若原样传给下游的
+        # f"{speed:.1f}" 会抛 ValueError: Unknown format code 'f' for object of type 'str'，
+        # 导致事件级 AI 仲裁整体失效（事件长期停留在 pending_ai）。
+        # 此处统一强制为数值类型（2026-10-02 由 DSH 修复）。
+        def _num(val, default=0.0):
+            if isinstance(val, (int, float)):
+                return float(val)
+            if isinstance(val, str):
+                import re as _re
+                m = _re.search(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?", val)
+                if m:
+                    try:
+                        return float(m.group(0))
+                    except ValueError:
+                        pass
+            return default
+
         return {
             'track_id': track_id,
             'bbox': v_info.get('bbox', getattr(violation, 'evidence', {}).get('bbox', [])),
             'class_name': v_info.get('class_name', 'unknown'),
-            'speed': v_info.get('speed', 0.0),
-            'direction': v_info.get('direction', 0.0),
+            # 没有原始置信度时保留 None；不可伪造为 0.00 再交给云端审核。
+            'confidence': _num(v_info.get('confidence', getattr(violation, 'confidence', None)), default=None),
+            'speed': _num(v_info.get('speed', 0.0)),
+            'direction': _num(v_info.get('direction', 0.0)),
             'plate_number': v_info.get('plate_number', ''),
         }
 
@@ -257,7 +346,21 @@ class TrafficEventEngine:
             新创建的 TrafficEvent，或 None（如果创建失败）
         """
         track_id = vehicle_info.get('track_id', -1)
-        now = time.time()
+        now = self._now()
+        # ★2026-10-06 诊断日志（DSH 临时加入，用于坐实事件洪泛的根因）：
+        # 打印每次触发事件时的 track_id / 类型 / 冷却键当前值。
+        # 若同一辆车在一圈内打印出多个不同的 track_id -> 是追踪关联问题；
+        # 若 track_id 始终相同却仍多次触发   -> 是冷却键/状态机问题。
+        # 定位完即可删除（搜 DIAG-TRACK 可找到全部插入点）。
+        try:
+            _key = (track_id, event_type)
+            _cd = self._cooldowns.get(_key)
+            logger.info("[DIAG-TRACK] 触发事件 类型=%s track_id=%s 时间=%.2f "
+                        "冷却键=%s 已有冷却=%s"
+                        % (event_type, track_id, now, _key,
+                           ("%.2f" % _cd) if _cd else "无"))
+        except Exception:
+            pass
         event = TrafficEvent(
             event_id=f"evt_{int(now*1000)}_{track_id}_{uuid.uuid4().hex[:6]}",
             event_type=event_type,
@@ -282,9 +385,96 @@ class TrafficEventEngine:
             self._events[event.event_id] = event
             self._cooldowns[(track_id, event_type)] = event.cooldown_until
 
+        # 创建即落库（2026-10-03 由 DSH 新增）
+        # 初始状态 TRIGGERED 不经 _update_event_state，需在此显式插入，
+        # 否则事件在库里不存在，后续证据链落库会找不到行。
+        self._persist_event(event)
+
         logger.info(f"[TrafficEventEngine] 触发事件 {event.event_id} type={event_type} "
                     f"track={track_id} state=TRIGGERED")
         return event
+
+    # ------------------------------------------------------------------
+    # 事件持久化（2026-10-03 由 DSH 新增）
+    # ⚠ 背景：本引擎原为**纯内存**实现，事件从不写入 traffic_events 表。
+    # 实测证据：状态接口显示内存有 42 个事件，而数据库最新 created_at 停留在
+    # 2026-10-02 19:13:29（541 行 created_at 全在同一秒 = 迁移脚本批量导入）。
+    # 后果：① 重启即丢失（含终态）② evidence_chain 永远为空 ③ 前端事件中心
+    # 只看到旧数据 ④ 违反"证据链可追溯"红线。
+    # 详见 docs/EVENT_PERSISTENCE_AUDIT.md
+    # ------------------------------------------------------------------
+    def _persist_event(self, event: "TrafficEvent") -> bool:
+        """把事件 upsert 到 traffic_events 表（存在则更新，不存在则插入）
+
+        用 event_id 作为唯一键。任何状态流转都会调用（见 _update_event_state），
+        因此事件一创建（TRIGGERED）就会落库，后续状态变化同步更新。
+        """
+        try:
+            import json as _json
+
+            from database import SessionLocal
+            # 模型类名是 TrafficEventRecord（表 traffic_events）
+            from models import TrafficEventRecord
+
+            def _j(v):
+                try:
+                    return _json.dumps(v, ensure_ascii=False, default=str)
+                except Exception:
+                    return _json.dumps(str(v), ensure_ascii=False)
+
+            # trigger_time: dataclass 用 float 时间戳，DB 用 DateTime
+            #
+            # ★★2026-10-10 由 DSH 修正：**落库必须用墙钟（wall_time），不能用 trigger_time**。
+            #   trigger_time 是**视频时间**（用于在帧缓存里定位关键帧），不是 Unix 时间戳：
+            #     · 用它当时间戳 -> 事件表出现 1970-01-01 08:00:10 这种行（本轮实测）；
+            #     · 它为负时 fromtimestamp 抛 OSError -> 被 except 兜成 datetime.now()
+            #       -> 表面正常，掩盖了这个错误（14 条负时间事件就是这么"混过去"的）。
+            #   兼容：老事件对象没有 wall_time 字段时退回旧算法（保证不炸）。
+            tt = getattr(event, 'wall_time', 0) or getattr(event, 'trigger_time', None)
+            try:
+                tt_dt = datetime.fromtimestamp(float(tt)) if tt else datetime.now()
+            except (TypeError, ValueError, OSError, OverflowError):
+                tt_dt = datetime.now()
+
+            vals = {
+                'event_type': event.event_type,
+                'track_id': event.track_id,
+                'state': (event.state.value if hasattr(event.state, 'value') else str(event.state)),
+                'trigger_time': tt_dt,
+                'vehicle_info': _j(event.vehicle_info),
+                'scene_context': _j(event.scene_context),
+                'trajectory': _j(event.trajectory),
+                'key_frames': _j(event.key_frames),
+                'event_video_path': event.event_video_path or '',
+                'rule_judgment': _j(event.rule_judgment),
+                'ai_judgment': _j(event.ai_judgment) if event.ai_judgment else None,
+                'ai_confidence': float(event.ai_confidence or 0.0),
+                'ai_explanation': event.ai_explanation or '',
+                'state_history': _j(event.state_history),
+            }
+
+            db = SessionLocal()
+            try:
+                row = db.query(TrafficEventRecord).filter(
+                    TrafficEventRecord.event_id == event.event_id).first()
+                if row is None:
+                    row = TrafficEventRecord(event_id=event.event_id, **vals)
+                    db.add(row)
+                    _action = 'INSERT'
+                else:
+                    for k, v in vals.items():
+                        setattr(row, k, v)
+                    _action = 'UPDATE'
+                db.commit()
+                logger.debug(f"[TrafficEventEngine] 事件落库 {_action} {event.event_id} "
+                             f"state={vals['state']}")
+                return True
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(f"[TrafficEventEngine] 事件落库失败 {getattr(event,'event_id','?')}: "
+                           f"{type(e).__name__}: {str(e)[:150]}")
+            return False
 
     def _extract_trajectory(self, vehicle_info: Dict) -> List[Dict[str, Any]]:
         """从车辆信息提取轨迹点（简化版，真实场景从 tracker 获取）"""
@@ -294,6 +484,24 @@ class TrafficEventEngine:
         cx = (bbox[0] + bbox[2]) / 2
         cy = (bbox[1] + bbox[3]) / 2
         return [{'x': cx, 'y': cy, 'timestamp': time.time()}]
+
+    def reject(self, event_id: str, reason: str = ""):
+        """直接排除事件（2026-10-03 由 DSH 新增）
+
+        用途：本地就能判定"无法验证"的事件（例如**未标定的超速** —— 云端视觉
+        模型无法从图像测速，送审必然被判 rejected 且白烧 token）。
+        与"AI 判否"的区别在于 reason 里会写明具体原因，可追溯。
+
+        Args:
+            event_id: 事件 ID
+            reason: 排除原因（建议写明"为何不送 AI"）
+        """
+        with self._lock:
+            event = self._events.get(event_id)
+        if not event:
+            raise KeyError(f"事件不存在: {event_id}")
+        self._update_event_state(event, EventState.REJECTED,
+                                 reason=reason or "本地判定排除")
 
     def _update_event_state(self, event: TrafficEvent, new_state: EventState,
                             reason: str = ""):
@@ -328,6 +536,10 @@ class TrafficEventEngine:
         logger.info(f"[TrafficEventEngine] 事件 {event.event_id} 状态变更: "
                     f"{old_state.value} → {new_state.value} reason={reason}")
 
+        # 状态变化 -> 同步落库（2026-10-03 由 DSH 新增）
+        # 这是所有状态流转的唯一收口点，在此 upsert 可保证库里状态与内存一致。
+        self._persist_event(event)
+
     def _check_cooldown(self, track_id: int, event_type: str) -> bool:
         """检查冷却期 — 避免同一车辆短时间内重复触发
 
@@ -337,7 +549,7 @@ class TrafficEventEngine:
         key = (track_id, event_type)
         with self._lock:
             cooldown_until = self._cooldowns.get(key, 0)
-            if cooldown_until and time.time() < cooldown_until:
+            if cooldown_until and self._now() < cooldown_until:
                 return False
             # 过期则清理
             if cooldown_until:
@@ -458,6 +670,30 @@ class TrafficEventEngine:
 
         logger.info(f"[TrafficEventEngine] 事件 {event_id} AI 结果: judgment={judgment} "
                     f"conf={confidence:.2f} → state={event.state.value}")
+
+    def mark_manual_review(self, event_id: str, reason: str = "") -> None:
+        """把事件转入"待人工复核" — PENDING_AI → MANUAL_REVIEW
+
+        ★2026-10-06 由 DSH 新增，配合运行时开关 `cloud_review`（用户决策 C：
+        关掉云端复核后转人工复核队列）。
+
+        为什么不直接复用 apply_ai_result：
+          那个方法会写入 ai_judgment/ai_confidence，并强制 PENDING_AI → AI_REVIEWED；
+          而本路径**根本没有 AI 结果**，硬塞会把"没复核"记成"AI 已复核"。
+
+        为什么经 PENDING_AI 中转：
+          ① VALID_TRANSITIONS 里 RECORDING 只能去 PENDING_AI / REJECTED，
+             而 REJECTED 是**终态**，进去就再也接不了人工复核；
+          ② PENDING_AI 的语义本就是"等待复核"（提交给谁由开关决定），
+             状态机因此**无需改动**，MANUAL_REVIEW → CONFIRMED/REJECTED 照旧合法。
+        """
+        with self._lock:
+            event = self._events.get(event_id)
+        if not event:
+            raise KeyError(f"事件不存在: {event_id}")
+        self._update_event_state(
+            event, EventState.MANUAL_REVIEW,
+            reason=reason or "转入人工复核队列")
 
     def manual_review(self, event_id: str, confirmed: bool, reviewer: str = "",
                       comment: str = ""):

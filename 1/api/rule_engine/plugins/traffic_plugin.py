@@ -155,6 +155,12 @@ class TrafficPlugin(BaseRulePlugin):
           1. scene_context["vehicles"]（list[dict]）
           2. scene_context["tracked_vehicles"]（dict[id -> dict]）
           3. tracker.get_all_vehicles()（若提供 tracker 且有该方法）
+          4. tracker 本身即是 tracked_vehicles 字典（dict[id -> vehicle]）
+
+        第 4 条对应生产调用形态：TrafficEventEngine.process_frame 把
+        realtime_detector.tracked_vehicles 原样作为第三实参传给
+        plugin.analyze(frame, scene_context, tracked_vehicles)，
+        此时车辆在 tracker 实参里，scene_context（检测器 scene_config）中不含车辆。
         """
         if not isinstance(scene_context, dict):
             return []
@@ -172,6 +178,10 @@ class TrafficPlugin(BaseRulePlugin):
                 return list(tracker.get_all_vehicles())
             except Exception:
                 return []
+
+        # 生产形态：tracker 实参就是 {track_id: vehicle_dict}
+        if isinstance(tracker, dict) and tracker:
+            return [v for v in tracker.values() if isinstance(v, dict) and v]
 
         return []
 

@@ -1,0 +1,354 @@
+/* ============================================================================
+ * 智瞳灵声管理端 — 设计令牌（Design Tokens）
+ * 生成依据：ui-ux-pro-max 设计系统（traffic enforcement admin dashboard,
+ *          variance=5 balanced / motion=3 subtle / density=8 dashboard）
+ * 生成日期：2026-10-03 · 执行者：DSH
+ *
+ * 目的：消除"Element Plus 默认主题"带来的 AI 生成感。
+ * 现状问题（已诊断）：
+ *   - 主色直接用 EP 默认蓝 #409EFF（8 处硬编码）
+ *   - 卡片/圆角/阴影/间距全为默认值，无视觉层次
+ *   - 数字区域混用 Consolas/monospace，未统一
+ *
+ * 策略：**亮色为主 + 科技感精修**（而非全量换暗色）。
+ *   理由：现有 8 个页面存在硬编码浅色（#ecf5ff 等），全暗色改造风险高；
+ *         演示前优先保证"不破坏"，用令牌化+主题变量一次性提升质感。
+ *   暗色大屏作为可选模式保留（html.dark 下生效）。
+ *
+ * 使用方式：在 main.js 中 import 本文件（需晚于 element-plus 样式）
+ * ========================================================================= */
+
+:root {
+  /* ---------- 1. 品牌色（替代 EP 默认 #409EFF）---------- */
+  /* 主色：深邃交通蓝，比 EP 默认蓝更沉、更有权威感 */
+  --zt-primary: #1D4ED8;
+  --zt-primary-hover: #2563EB;
+  --zt-primary-active: #1E40AF;
+  --zt-primary-soft: #EFF4FF;      /* 浅底（替代 #ecf5ff）*/
+  --zt-primary-border: #BFD3FE;
+
+  /* 语义色：状态即信息（交通系统核心语义） */
+  --zt-success: #16A34A;           /* 正常 / 已确认 */
+  --zt-success-soft: #ECFDF3;
+  --zt-warning: #D97706;           /* 待人工复核 */
+  --zt-warning-soft: #FFFBEB;
+  --zt-danger: #DC2626;            /* 违规 / 逆行 / 闯红灯 */
+  --zt-danger-soft: #FEF2F2;
+  --zt-info: #0891B2;
+  --zt-info-soft: #ECFEFF;
+
+  /* ---------- 2. 中性色阶（层次感的来源）---------- */
+  --zt-bg: #F6F7F9;                /* 页面底：略灰，让卡片浮起来 */
+  --zt-surface: #FFFFFF;           /* 卡片面 */
+  --zt-surface-2: #FAFBFC;         /* 次级面（表头/斑马纹）*/
+  --zt-border: #E4E7EC;            /* 分隔线：比 EP 默认更浅更柔 */
+  --zt-border-strong: #CDD3DC;
+  --zt-text: #101828;              /* 主文本：不用纯黑，降低刺眼 */
+  --zt-text-secondary: #475467;
+  --zt-text-muted: #98A2B3;
+  --zt-text-inverse: #FFFFFF;
+
+  /* ---------- 3. 字体（统一，消除 Consolas 混用）---------- */
+  /* UI 字体：Inter 优先，中文回退到系统黑体 */
+  --zt-font-ui: 'Inter', -apple-system, 'Segoe UI', 'Microsoft YaHei',
+                'PingFang SC', 'Hiragino Sans GB', sans-serif;
+  /* 数字/车牌/ID 专用等宽：数据可对齐，且比 Consolas 现代 */
+  --zt-font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Mono',
+                  'Consolas', monospace;
+
+  --zt-fs-xs: 12px;
+  --zt-fs-sm: 13px;
+  --zt-fs-base: 14px;              /* 管理端 14 比 16 更紧凑（density=8）*/
+  --zt-fs-lg: 16px;
+  --zt-fs-xl: 20px;
+  --zt-fs-2xl: 28px;
+  --zt-fs-3xl: 34px;               /* KPI 大数字 */
+
+  --zt-lh-tight: 1.25;
+  --zt-lh-base: 1.5;
+
+  /* ---------- 4. 间距（density=8：紧凑但有呼吸）---------- */
+  --zt-space-1: 4px;
+  --zt-space-2: 8px;
+  --zt-space-3: 12px;
+  --zt-space-4: 16px;
+  --zt-space-5: 20px;
+  --zt-space-6: 24px;
+  --zt-space-8: 32px;
+
+  /* ---------- 5. 圆角（比 EP 默认更克制）---------- */
+  --zt-radius-sm: 4px;
+  --zt-radius: 8px;
+  --zt-radius-lg: 12px;
+  --zt-radius-pill: 999px;
+
+  /* ---------- 6. 阴影（层次感关键：EP 默认阴影太平）---------- */
+  --zt-shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --zt-shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.08),
+                  0 1px 2px rgba(16, 24, 40, 0.04);
+  --zt-shadow: 0 4px 12px rgba(16, 24, 40, 0.08);
+  --zt-shadow-lg: 0 12px 28px rgba(16, 24, 40, 0.12);
+  /* 主色光晕：用于焦点/选中态，制造"科技感" */
+  --zt-glow-primary: 0 0 0 3px rgba(29, 78, 216, 0.16);
+
+  /* ---------- 7. 动效（motion=3 subtle）---------- */
+  --zt-dur-fast: 120ms;
+  --zt-dur: 180ms;
+  --zt-dur-slow: 260ms;
+  --zt-ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================================================
+ * 覆盖 Element Plus 主题变量（这是"去默认感"的核心一步）
+ * 只要这些变量生效，EP 组件会自动跟随，无需改每个页面
+ * ========================================================================= */
+:root {
+  --el-color-primary: var(--zt-primary);
+  --el-color-primary-light-3: var(--zt-primary-hover);
+  --el-color-primary-light-5: #5B8DEF;
+  --el-color-primary-light-7: #A8C0F8;
+  --el-color-primary-light-8: #C7D7FB;
+  --el-color-primary-light-9: var(--zt-primary-soft);
+  --el-color-primary-dark-2: var(--zt-primary-active);
+
+  --el-color-success: var(--zt-success);
+  --el-color-warning: var(--zt-warning);
+  --el-color-danger: var(--zt-danger);
+  --el-color-error: var(--zt-danger);
+  --el-color-info: var(--zt-info);
+
+  --el-text-color-primary: var(--zt-text);
+  --el-text-color-regular: var(--zt-text-secondary);
+  --el-text-color-secondary: var(--zt-text-muted);
+
+  --el-border-color: var(--zt-border);
+  --el-border-color-light: var(--zt-border);
+  --el-border-color-lighter: var(--zt-border);
+  --el-fill-color-blank: var(--zt-surface);
+  --el-bg-color: var(--zt-surface);
+  --el-bg-color-page: var(--zt-bg);
+
+  --el-border-radius-base: var(--zt-radius);
+  --el-border-radius-small: var(--zt-radius-sm);
+  --el-font-family: var(--zt-font-ui);
+  --el-font-size-base: var(--zt-fs-base);
+
+  --el-box-shadow-light: var(--zt-shadow-sm);
+  --el-box-shadow: var(--zt-shadow);
+}
+
+/* ============================================================================
+ * 基础样式与通用类（供各页面复用，避免重复硬编码）
+ * ========================================================================= */
+body {
+  margin: 0;
+  background: var(--zt-bg);
+  color: var(--zt-text);
+  font-family: var(--zt-font-ui);
+  font-size: var(--zt-fs-base);
+  line-height: var(--zt-lh-base);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 数字/ID/车牌统一等宽，且启用 tabular 对齐 */
+.zt-mono,
+.zt-kpi-value,
+.zt-plate {
+  font-family: var(--zt-font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* KPI 卡片（2026-10-03 由 DSH 重构：主次分明 + 横向布局）
+ * 目的：消除"6 个相同方块"的框架默认感 —— 用版式差异制造视觉层次 */
+.zt-kpi {
+  background: var(--zt-surface);
+  border: 1px solid var(--zt-border);
+  border-radius: var(--zt-radius-lg);
+  box-shadow: var(--zt-shadow-xs);
+  padding: var(--zt-space-4) var(--zt-space-5);
+  transition: box-shadow var(--zt-dur) var(--zt-ease),
+              transform var(--zt-dur) var(--zt-ease),
+              border-color var(--zt-dur) var(--zt-ease);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--zt-space-2);
+}
+.zt-kpi:hover {
+  box-shadow: var(--zt-shadow);
+  transform: translateY(-2px);
+  border-color: var(--zt-primary-border);
+}
+/* 主卡：更大的内边距与字号，左对齐且带底部状态行 */
+.zt-kpi--hero {
+  padding: var(--zt-space-5) var(--zt-space-6);
+  background: linear-gradient(135deg,
+              var(--zt-surface) 0%,
+              var(--zt-primary-soft) 140%);
+}
+.zt-kpi--hero .zt-kpi__value { font-size: var(--zt-fs-3xl); }
+.zt-kpi__head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--zt-space-2);
+}
+.zt-kpi__row {
+  display: flex; align-items: center; gap: var(--zt-space-2);
+}
+.zt-kpi__label {
+  font-size: var(--zt-fs-sm);
+  color: var(--zt-text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.zt-kpi__value { color: var(--zt-text); font-weight: 600; line-height: 1.15; }
+.zt-kpi__foot {
+  display: flex; align-items: center; gap: var(--zt-space-1);
+  font-size: var(--zt-fs-xs);
+  color: var(--zt-text-muted);
+}
+/* 图标底：小面积、语义着色（不用大面积色块，避免"花"） */
+.zt-kpi__icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px;
+  border-radius: var(--zt-radius-sm);
+  flex: none;
+}
+.zt-kpi--hero .zt-kpi__icon { width: 34px; height: 34px; }
+.kpi-icon--primary { background: var(--zt-primary-soft); color: var(--zt-primary); }
+.kpi-icon--warning { background: var(--zt-warning-soft); color: var(--zt-warning); }
+.kpi-icon--info    { background: var(--zt-info-soft);    color: var(--zt-info); }
+.kpi-icon--pending { background: var(--zt-warning-soft); color: var(--zt-warning); }
+.kpi-icon--success { background: var(--zt-success-soft); color: var(--zt-success); }
+.kpi-icon--online  { background: var(--zt-info-soft);    color: var(--zt-info); }
+/* 状态圆点 */
+.kpi-dot {
+  width: 6px; height: 6px; border-radius: 50%; display: inline-block;
+}
+.kpi-dot--success { background: var(--zt-success); }
+.kpi-dot--danger  { background: var(--zt-danger); }
+.kpi-dot--warning { background: var(--zt-warning); }
+
+
+/* 状态徽标（交通系统语义化状态） */
+.zt-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zt-space-1);
+  padding: 2px 10px;
+  border-radius: var(--zt-radius-pill);
+  font-size: var(--zt-fs-xs);
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.zt-badge--danger  { background: var(--zt-danger-soft);  color: var(--zt-danger); }
+.zt-badge--success { background: var(--zt-success-soft); color: var(--zt-success); }
+.zt-badge--warning { background: var(--zt-warning-soft); color: var(--zt-warning); }
+.zt-badge--info    { background: var(--zt-info-soft);    color: var(--zt-info); }
+
+/* 键盘可达性：焦点环（EP 默认焦点不够明显） */
+:focus-visible {
+  outline: 2px solid var(--zt-primary);
+  outline-offset: 2px;
+  border-radius: var(--zt-radius-sm);
+}
+
+/* 表格：去掉 EP 默认的重边框，改轻分隔 + 斑马纹 */
+.el-table th.el-table__cell {
+  background: var(--zt-surface-2);
+  color: var(--zt-text-secondary);
+  font-weight: 600;
+}
+.el-table .el-table__row:hover > td.el-table__cell {
+  background: var(--zt-primary-soft);
+}
+
+/* 尊重用户降低动效偏好（无障碍要求） */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================================================
+ * 可选：暗色大屏模式（html.dark 时生效）
+ * 用途：指挥中心/答辩大屏演示。当前默认不启用，避免与既有浅色硬编码冲突。
+ *
+ * 设计参考（2026-10-03 用户指定）：Mineradio (github.com/XxHuberrr/Mineradio-paused, 10.9k star)
+ *   借鉴点：① 深色分层用"明度差 + 极细描边"而非阴影堆叠
+ *          ② 高饱和强调色只在小面积使用（焦点明确）
+ *          ③ 中文字体专门优选 + 数据等宽字体
+ *   取其"设计语言"，不取其音乐播放器布局。
+ * ========================================================================= */
+html.dark {
+  /* 底色分层（Mineradio: bg #08090B / paper #0E1014 / hair #1A1D22） */
+  --zt-bg: #0B0D10;
+  --zt-surface: #12151A;
+  --zt-surface-2: #171B21;
+  --zt-border: #22272F;          /* 极细分隔线 */
+  --zt-border-strong: #2E343D;
+  /* 文字三级（Mineradio: ink / ink-2 / muted） */
+  --zt-text: #E8ECEF;
+  --zt-text-secondary: #C3C9D0;
+  --zt-text-muted: #8A9099;
+  /* 强调色：电光蓝（Mineradio --fc-blue: #2442ff），小面积使用 */
+  --zt-primary: #3B5BFF;
+  --zt-primary-hover: #5570FF;
+  --zt-primary-active: #2442FF;
+  --zt-primary-soft: #141A33;
+  --zt-primary-border: #253566;
+  /* 品牌光晕（Mineradio: 0 0 34px rgba(0,245,212,.052) 的同类手法） */
+  --zt-shadow-xs: none;
+  --zt-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.45);
+  --zt-shadow: 0 12px 40px rgba(0, 0, 0, 0.5),
+               0 0 30px rgba(59, 91, 255, 0.06);
+  --zt-shadow-lg: 0 22px 64px rgba(0, 0, 0, 0.55),
+                  0 0 40px rgba(59, 91, 255, 0.08);
+  --zt-glow-primary: 0 0 0 3px rgba(59, 91, 255, 0.32);
+  /* 语义色（深色下提高亮度保证对比度） */
+  --zt-success: #34D399;
+  --zt-success-soft: #0C2A1C;
+  --zt-warning: #FBBF24;
+  --zt-warning-soft: #2C2110;
+  --zt-danger: #F87171;
+  --zt-danger-soft: #2C1416;
+  --zt-info: #22D3EE;
+  --zt-info-soft: #0B2530;
+}
+html.dark body {
+  background: var(--zt-bg);
+  color: var(--zt-text);
+}
+/* 深色下的 Element Plus 变量同步（EP 组件跟随） */
+html.dark {
+  --el-bg-color: var(--zt-surface);
+  --el-bg-color-page: var(--zt-bg);
+  --el-bg-color-overlay: var(--zt-surface-2);
+  --el-text-color-primary: var(--zt-text);
+  --el-text-color-regular: var(--zt-text-secondary);
+  --el-text-color-secondary: var(--zt-text-muted);
+  --el-border-color: var(--zt-border);
+  --el-border-color-light: var(--zt-border);
+  --el-border-color-lighter: var(--zt-border);
+  --el-fill-color-blank: var(--zt-surface);
+  --el-fill-color-light: var(--zt-surface-2);
+  --el-mask-color: rgba(0, 0, 0, 0.7);
+}
+/* 深色表格：去重边框，改用极细描边（Mineradio 手法） */
+html.dark .el-table,
+html.dark .el-table tr,
+html.dark .el-table th.el-table__cell,
+html.dark .el-table td.el-table__cell {
+  background-color: transparent;
+  border-color: var(--zt-border);
+}
+html.dark .el-table th.el-table__cell {
+  background: var(--zt-surface-2);
+  color: var(--zt-text-secondary);
+}
+html.dark .el-table .el-table__row:hover > td.el-table__cell {
+  background: var(--zt-primary-soft);
+}

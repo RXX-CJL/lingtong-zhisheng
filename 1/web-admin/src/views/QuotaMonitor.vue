@@ -29,7 +29,7 @@
           <el-card shadow="hover" class="provider-card">
             <template #header>
               <div class="provider-header">
-                <span><el-icon color="#ff6600"><Key /></el-icon> 阿里云 DashScope（豆包大模型）</span>
+                <span><el-icon color="#ff6600"><Key /></el-icon> 阿里云 DashScope（通义千问）</span>
               </div>
             </template>
             
@@ -172,16 +172,15 @@
                   style="margin-top: 12px"
                 />
                 
-                <!-- DeepSeek 接口预留说明 -->
+                <!-- DeepSeek 配置说明 -->
                 <el-alert
-                  title="DeepSeek 接口预留说明"
+                  title="DeepSeek 配置说明"
                   type="info"
                   :closable="false"
                   show-icon
                   style="margin-top: 12px"
                 >
-                  DeepSeek 云端分析接口暂未接入，当前云端分析统一使用豆包大模型。
-                  此处配置 DeepSeek Key 仅作为预留，待接入后可切换使用。
+                  本页仅管理 DeepSeek API Key 的连通性与本地调用计数；是否用于事件复核，以系统当前实际配置和调用链为准。
                 </el-alert>
                 
                 <!-- 手动刷新按钮 -->
@@ -198,6 +197,72 @@
           </el-card>
         </el-col>
       </el-row>
+
+      <!-- 通用云端 AI API 配置预留：当前仅展示设计，不保存配置、不调用外部服务 -->
+      <el-card shadow="never" class="future-api-card">
+        <template #header>
+          <div class="card-header">
+            <span>通用云端 AI API 配置（预留）</span>
+            <el-tag type="info">尚未接入</el-tag>
+          </div>
+        </template>
+
+        <el-alert
+          title="当前仅预留配置界面，不会保存信息或发起 API 调用。请勿在此输入真实 API Key。"
+          type="info"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 18px"
+        />
+
+        <el-form label-width="130px" size="small" disabled>
+          <el-row :gutter="16">
+            <el-col :xs="24" :md="12">
+              <el-form-item label="服务商标识">
+                <el-input placeholder="接入时配置，例如 provider-id" />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :md="12">
+              <el-form-item label="模型标识">
+                <el-input placeholder="接入时配置，例如 model-id" />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24">
+              <el-form-item label="API Base URL">
+                <el-input placeholder="接入时配置服务商 API 地址（建议 HTTPS）" />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :md="12">
+              <el-form-item label="API Key">
+                <el-input type="password" placeholder="接入后由后端安全保存，不向前端回传明文" />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :md="12">
+              <el-form-item label="月度预算上限">
+                <el-input placeholder="接入后配置；需由后端执行预算限制" />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :md="12">
+              <el-form-item label="统计周期">
+                <el-input placeholder="预留：按月统计调用量与费用" />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :md="12">
+              <el-form-item label="调用策略">
+                <el-input placeholder="预留：按需触发、周期任务或事件复核" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-form-item>
+            <el-button type="primary" disabled>保存配置</el-button>
+            <el-button disabled>测试连接</el-button>
+          </el-form-item>
+        </el-form>
+
+        <p class="future-api-note">
+          后续接入时，将通过独立后端适配器实现配置保存、连接验证、调用统计和预算检查；此预留区目前不代表这些能力已经实现。
+        </p>
+      </el-card>
     </el-card>
   </div>
 </template>
@@ -321,6 +386,24 @@ async function handleHeartbeatDeepSeek() {
 
 <style scoped lang="scss">
 .quota-monitor {
+  .future-api-card {
+    margin-top: 20px;
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .future-api-note {
+      margin: 4px 0 0;
+      color: var(--el-text-color-secondary);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+  }
+
   .card-header {
     display: flex;
     justify-content: space-between;

@@ -28,6 +28,7 @@
           <el-option :value="0" label="全部" />
         </el-select>
         <el-button @click="refresh" :icon="Refresh">刷新</el-button>
+        <el-button @click="doCopySummary" type="success" plain>复制诊断摘要</el-button>
         <el-button @click="doExport" :icon="Download" type="primary">导出 JSON</el-button>
         <el-popconfirm
           title="确认清空全部前端日志？（不可恢复）"
@@ -187,6 +188,27 @@ function doExport() {
   const ok = logger.exportAsJsonDownload()
   ElMessage[ok ? 'success' : 'error'](ok ? '导出已开始下载' : '导出失败')
 }
+
+/** ★2026-10-10 新增：一键复制诊断摘要
+ *  用途：排查"开久了像断网 / timeout"这类**累积型**故障时，
+ *  用户不用下载整个 JSON，直接复制一小段文字给 AI 即可。
+ *  （设计单 §12.7 的建议；这次导出崩溃也说明"多一条退路"是必要的。）
+ */
+async function doCopySummary() {
+  const text = logger.diagnosticSummary()
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success('诊断摘要已复制到剪贴板')
+  } catch (_) {
+    // 剪贴板 API 需要 https/localhost + 用户授权，失败就退回下载
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `zhitong-diag-${Date.now()}.txt`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    ElMessage.warning('剪贴板不可用，已改为下载诊断摘要文件')
+  }
+}
 function doClear() {
   logger.clear()
   refresh()
@@ -197,6 +219,9 @@ function formatErr(err) {
   return `${err.name || 'Error'}: ${err.message || ''}\n${err.stack || ''}`
 }
 function formatExtra(e) {
+  // ★2026-10-10：logger 现在把 extra 统一存成**已安全序列化的字符串**；
+  // 这里对新旧两种形态都要能显示（老记录里可能还留着对象）。
+  if (typeof e === 'string') return e
   try { return JSON.stringify(e, null, 2) }
   catch (_) { return String(e) }
 }

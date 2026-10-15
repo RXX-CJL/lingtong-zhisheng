@@ -368,7 +368,10 @@ def carla_camera_callback(image):
     global carla_frame
     array = np.frombuffer(image.raw_data, dtype=np.uint8)
     array = np.reshape(array, (image.height, image.width, 4))
-    carla_frame = array[:, :, :3][:, :, ::-1]  # RGBA -> BGR
+    # ★2026-10-04 修正：CARLA raw_data 是 **BGRA**，取前 3 通道**就是 BGR**。
+    # 原先这里多做了 [:, :, ::-1]（把它变成 RGB 却当 BGR 用），
+    # 会导致【红蓝互换】—— 红灯看起来是青蓝色、橙色物体会发蓝。
+    carla_frame = array[:, :, :3]
 
 def init_carla():
     global carla_frame, carla_actors, walker_actor, carla_module

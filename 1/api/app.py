@@ -9,11 +9,20 @@ from logging.handlers import RotatingFileHandler
 
 from routers import violations, wechat, system, statistics, devices, appeals, auth
 from routers import cloud_collab, rtsp_stream, realtime
+from routers import scene  # 场景标注（2026-10-03 由 DSH 新增）
+from routers import wx_miniapp  # 微信小程序（2026-10-03 由 DSH 新增）
 from database import init_db
 
 # 配置日志系统
 def setup_logging():
-    log_dir = "output/logs"
+    # ★2026-10-06 由 DSH 改为**绝对路径锚定**（原来写 "output/logs" 是相对 cwd 的）：
+    #   从项目根启动 -> E:\output\1\output\logs\api.log
+    #   从 api\ 启动   -> E:\output\1\api\output\logs\api.log
+    #   于是"日志在哪"取决于启动方式，用户排查时找错文件（本轮就发生过：
+    #   api\output\logs\api.log 停在 10-02，而真实日志在 项目根\output\logs\，
+    #   已长到 6.7MB）。app.py 必须只写"位置固定、可预期"的日志。
+    _api_dir = os.path.dirname(os.path.abspath(__file__))
+    log_dir = os.path.join(_api_dir, "output", "logs")
     os.makedirs(log_dir, exist_ok=True)
     
     # 创建 logger
@@ -129,10 +138,27 @@ app.include_router(auth.router)
 app.include_router(cloud_collab.router)
 app.include_router(rtsp_stream.router)
 app.include_router(realtime.router)
+app.include_router(scene.router)   # 场景标注（2026-10-03 由 DSH 新增）
+app.include_router(wx_miniapp.router)  # 微信小程序（2026-10-03 由 DSH 新增）
 
-# 静态文件服务
-if os.path.exists("uploads"):
-    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# 静态文件服务（2026-10-03 由 DSH 修复：改为路径无关）
+# 原实现用相对路径 "uploads"，依赖启动时的 cwd；而证据图由
+# Config.UPLOAD_DIR 写入（绝对路径）-> 两者不一致时 /uploads 直接 404，
+# 前端证据抓拍墙拿不到图（实测：2043 张证据图全部无法访问）。
+try:
+    from config import Config as _Cfg
+    _uploads_dir = _Cfg.UPLOAD_DIR
+except Exception:
+    _uploads_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
+# 兼容两种布局：根/uploads 与 api/uploads（历史数据都在后者）
+for _cand in (_uploads_dir,
+              os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads"),
+              os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")):
+    if _cand and os.path.isdir(_cand):
+        _uploads_dir = _cand
+        break
+os.makedirs(_uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=_uploads_dir), name="uploads")
 
 # M07: 事件视频静态文件服务（GPT §10 证据链访问）
 # 事件视频按 {EVENT_VIDEO_DIR}/{YYYYMMDD}/{event_id}.mp4 组织
@@ -175,13 +201,21 @@ async def health_check():
         yolo_ok = False
         dashscope_ok = False
     
+    # ★2026-10-06 由 DSH 修正（G12）：原用相对路径 os.path.exists("uploads") /
+    # os.path.exists("zhitong_violations.db")，结果**取决于启动时的 cwd**：
+    # 从项目根启动时，前者可能为假、后者命中 0 字节空壳 → 健康检查给出假结论。
+    # 现改用 Config 的绝对路径（与 database.py / 静态挂载完全同源）。
+    from config import Config as _Cfg
     checks = {
         "status": "healthy",
         "version": "2.0.0",
         "yolo_available": yolo_ok,
         "dashscope_available": dashscope_ok,
-        "uploads_dir_exists": os.path.exists("uploads"),
-        "db_exists": os.path.exists("zhitong_violations.db")
+        "uploads_dir_exists": os.path.isdir(_Cfg.UPLOAD_DIR),
+        "db_exists": os.path.isfile(_Cfg.DB_PATH),
+        "db_path": _Cfg.DB_PATH,
+        "db_size_bytes": (os.path.getsize(_Cfg.DB_PATH)
+                          if os.path.isfile(_Cfg.DB_PATH) else 0),
     }
     checks["overall"] = "ok" if (yolo_ok and dashscope_ok) else "degraded"
     return checks
