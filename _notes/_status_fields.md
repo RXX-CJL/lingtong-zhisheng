@@ -1,0 +1,20 @@
+status 全部字段:
+   active_events             = 18
+   avg_fps                   = 2.83
+   cache_size                = 10
+   camera_index              = 0
+   confirmed_count           = 14
+   current_fps               = 0.01
+   event_engine              = {'available': True, 'total_events': 18, 'pending_ai': 1, 'confirmed': 
+   frame_buffer_duration     = 13.18
+   frame_buffer_size         = 300
+   frame_rate                = 3
+   pending_count             = 1
+   processed_frames          = 313
+   processing                = False
+   running                   = True
+   total_frames              = 2521
+   tracked_vehicle_count     = 4
+   traffic_light_confirmed   = 0
+   traffic_light_stats       = {'total': 0, 'none_dropped': 0, 'cnn': 0, 'hsv': 0, 'unknown': 0}
+   violation_count           = 10

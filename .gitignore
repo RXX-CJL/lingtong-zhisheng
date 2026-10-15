@@ -39,6 +39,8 @@ coverage/
 #    规则：忽略所有「_ 开头的目录」，仅放行两个长期资产目录。
 _*/
 !_tools/
+!_notes/
+!_reports/
 !_scripts/
 
 # 5) 根目录散落的媒体产物（用 / 锚定在仓库根，避免误伤子目录内的资源）
@@ -61,3 +63,4 @@ _*/
 dsh-workshop-backup/
 dsh-compaction-verify/
 dsh-workshop-src-recovered/
+
