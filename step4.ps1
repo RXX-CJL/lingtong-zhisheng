@@ -1,0 +1,1 @@
+Get-ChildItem -Path 'C:\' -Recurse -Force -File -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 500MB } | Sort-Object Length -Descending | Select-Object @{N='SizeMB';E={[math]::Round($_.Length/1MB,0)}}, FullName | Format-Table -AutoSize

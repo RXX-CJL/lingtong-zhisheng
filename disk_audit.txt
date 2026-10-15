@@ -1,0 +1,114 @@
+﻿=== DISK SUMMARY ===
+Total_GB: 240.6
+Used_GB: 215.3
+Free_GB: 25.3
+UsedPct: 89.5
+
+=== FIRST-LEVEL DIRECTORIES ===
+120.96	C:\Users
+120.96	C:\Documents and Settings
+17.22	C:\Program Files
+16.61	C:\miniconda
+8.75	C:\Program Files (x86)
+6.24	C:\Recovery
+5.99	C:\eSupport
+5.05	C:\ProgramData
+2.15	C:\$WinREAgent
+0.01	C:\CloudMusic
+0	C:\LauncherService
+0	C:\WCH.CN
+0	C:\AX NF ZZ
+0	C:\opaivmplayer
+0	C:\tmp
+0	C:\XmpCache
+0	C:\KRECYCLE
+0	C:\inetpub
+0	C:\leidian
+0	C:\PerfLogs
+0	C:\!UNKNOWN
+
+=== WINDOWS ===
+29.06	C:\Windows (excl WinSxS)
+
+=== SECOND-LEVEL BREAKDOWN (Top 6) ===
+
+--- C:\Users (120.96 GB) ---
+120.95	C:\Users\ROG
+5.05	C:\Users\All Users
+0	C:\Users\Public
+0	C:\Users\Default
+0	C:\Users\Default User
+0	C:\Users\AppData
+
+--- C:\Documents and Settings (120.96 GB) ---
+120.95	C:\Documents and Settings\ROG
+5.05	C:\Documents and Settings\All Users
+0	C:\Documents and Settings\Public
+0	C:\Documents and Settings\Default
+0	C:\Documents and Settings\Default User
+0	C:\Documents and Settings\AppData
+
+--- C:\Program Files (17.22 GB) ---
+8.87	C:\Program Files\WindowsApps
+3.04	C:\Program Files\Microsoft Office
+0.91	C:\Program Files\Microsoft SQL Server
+0.87	C:\Program Files\NVIDIA Corporation
+0.6	C:\Program Files\ASUS
+0.56	C:\Program Files\CanMV IDE K230
+0.5	C:\Program Files\Google
+0.44	C:\Program Files\Common Files
+0.34	C:\Program Files\Mozilla Firefox
+0.34	C:\Program Files\Razer
+
+--- C:\miniconda (16.61 GB) ---
+9.34	C:\miniconda\pkgs
+6.85	C:\miniconda\envs
+0.19	C:\miniconda\Library
+0.15	C:\miniconda\Lib
+0	C:\miniconda\DLLs
+0	C:\miniconda\include
+0	C:\miniconda\Scripts
+0	C:\miniconda\conda-meta
+0	C:\miniconda\libs
+0	C:\miniconda\share
+
+--- C:\Program Files (x86) (8.75 GB) ---
+6.06	C:\Program Files (x86)\Microsoft
+0.6	C:\Program Files (x86)\Common Files
+0.53	C:\Program Files (x86)\Google
+0.37	C:\Program Files (x86)\ASUS
+0.34	C:\Program Files (x86)\InstallShield Installation Information
+0.3	C:\Program Files (x86)\dotnet
+0.2	C:\Program Files (x86)\NVIDIA Corporation
+0.14	C:\Program Files (x86)\Radmin VPN
+0.04	C:\Program Files (x86)\Microsoft SQL Server
+0.04	C:\Program Files (x86)\Reference Assemblies
+
+--- C:\Recovery (6.24 GB) ---
+6.2	C:\Recovery\Customizations
+0.04	C:\Recovery\OEM
+
+=== FILES > 500MB ===
+8192	C:\Users\ROG\AppData\Local\NVIDIA\DXCache\c1f8a938afd5fb79.nvph
+7450	C:\Users\ROG\Downloads\CARLA_0.9.16.zip
+6447	C:\Windows\LiveKernelReports\WATCHDOG-20260920-1934.dmp
+6351	C:\Recovery\Customizations\usmt.ppkg
+6347	C:\Users\ROG\Downloads\ubuntu-24.04.4-desktop-amd64.iso
+2496	C:\System Volume Information\{298f4d8d-c8bc-11f1-8048-a0d3650262ab}{3808876b-c176-4e48-b7ae-04046e6cc752}
+2304	C:\pagefile.sys
+1713	C:\System Volume Information\{06518ac1-c847-11f1-8048-a0d3650262ab}{3808876b-c176-4e48-b7ae-04046e6cc752}
+1238	C:\miniconda\pkgs\pytorch-2.5.1-py3.11_cuda12.1_cudnn9_0.tar.bz2
+1193	C:\$WinREAgent\Scratch\update.wim
+1024	C:\Users\ROG\AppData\Local\NVIDIA\DXCache\ea5ca938afd5fb79.nvph
+1008	C:\$WinREAgent\Backup\Winre.wim
+885	C:\Users\ROG\AppData\Local\Programs\Python\Python312\Lib\site-packages\torch\lib\torch_cuda.dll
+850	C:\miniconda\envs\zhitong-gpu\Lib\site-packages\torch\lib\torch_cuda.dll
+850	C:\miniconda\pkgs\pytorch-2.5.1-py3.11_cuda12.1_cudnn9_0\Lib\site-packages\torch\lib\torch_cuda.dll
+768	C:\ProgramData\Microsoft\Search\Data\Applications\Windows\Windows.db
+623	C:\Users\ROG\AppData\Local\Programs\Python\Python312\Lib\site-packages\torch\lib\dnnl.lib
+623	C:\miniconda\pkgs\pytorch-2.5.1-py3.11_cuda12.1_cudnn9_0\Lib\site-packages\torch\lib\dnnl.lib
+623	C:\miniconda\envs\zhitong-gpu\Lib\site-packages\torch\lib\dnnl.lib
+562	C:\miniconda\pkgs\pytorch-2.5.1-py3.11_cuda12.1_cudnn9_0\Lib\site-packages\torch\lib\cudnn_engines_precompiled64_9.dll
+562	C:\miniconda\envs\zhitong-gpu\Lib\site-packages\torch\lib\cudnn_engines_precompiled64_9.dll
+562	C:\Users\ROG\AppData\Local\Programs\Python\Python312\Lib\site-packages\torch\lib\cudnn_engines_precompiled64_9.dll
+514	C:\Users\ROG\AppData\Local\Programs\Python\Python312\Lib\site-packages\torch\lib\cublasLt64_12.dll
