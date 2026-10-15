@@ -1596,5 +1596,44 @@ peer 要求随之从 `cordis ^4.0.2` 变为 `~4.0.4`（内核自带 4.0.4）—�
 
 - ★ **Trae 的 worktree**：`C:\Users\ROG\.trae-cn\worktrees\output\feat-empty-input-99G4ey`（分支指向 2026-06-10 的 `b2747f4`，相对 main 领先 0 个提交）。**属 Trae 资产，未动**（仅占 0.03 MB）。
 - 不属于本仓库的 `《供配电系统项目综合设计》工程日志_第3组.docx` 已按用户指示**移出**到 `C:\Users\ROG\Documents\供配电系统项目综合设计\`。
-- **纪律**：`E:\output` 是用户的 GitHub 仓库克隆 ⇒ **AI 不要自行 `git commit` / `git push`**（本轮是用户明确授权后才做的）。
+- **纪律**：`E:\output` 是用户的 GitHub 仓库克隆 ⇒ **AI 不要自行 `git commit` / `git push`**（本轮是用户明确授权后才做的）。**⚠ 该条已于 2026-10-16 被用户授权取代，见 §27.11(1)。**
+
+### 27.11 ★Git 授权 + C 盘瘦身 + output 整理（2026-10-16 第六轮）
+
+#### （1）★ Git 操作授权变更（用户 2026-10-16 明确授权）
+
+> 用户原话：「我信任你，从现在起**你可以自行 commit/push** `E:\output`（用户的 GitHub 仓库），**无需每次征求同意**。」
+
+⇒ **作废**上一节"AI 不要自行 git commit/push"的限制。**现行纪律**：
+- ✅ 可自行 `commit` / `push`（新增文件、整理、文档更新）
+- ⚠️ 仍须遵守：**不删本机文件** · **不提交测试/运行数据**（见 §27.10(4) 的 `.gitignore` 原则）· **不 force push、不重写已推送历史**
+- 本轮据此完成提交并推送：`16ebba0`（gh 状态与 git 治理记录）· `663e2ff`（整理根目录）· `2eb9fcb`（修正误忽略）
+
+#### （2）★ C 盘瘦身
+
+**磁盘布局（实测）**：`C/D/E` = 同一块 954 GB SSD 的三个分区（**C 仅剩 35.6 GB，已告急**）；**`F` = 独立致钛 TiPro7000 2TB SSD**（剩 **704.8 GB**，速度不输 C）。
+
+**阶段①已完成**：清理 `%TEMP%` 下 21 个**旧 DSH 工作区快照**（`dsh-workspace-changes-*`，保留最新 1 个）+ 4 个安装包缓存 → **回收 10.7 GB**（Temp **11.7 GB → 1.48 GB**）。
+
+**★ Temp 位置迁移（用户选定，已完成）**：`TEMP` / `TMP` **用户级**环境变量 → **`F:\Temp`**
+- **依据（源码权威）**：DSH 快照位置 = `os.tmpdir()` —— 见 `packages/deliverables/workspace-changes/src/recorder.ts`（`mkdtemp(join(this.env.tempRoot, 'dsh-workspace-changes-'))`）+ `index.ts`（`tempRoot: tmpdir()`）⇒ **DSH 无独立配置项，只能改环境变量**。
+- 连带效果：DSH 沙箱（`sandbox-windows-acl`）临时目录同样走 `tmpdir()`，会一起搬到 F 盘。
+- ⚠ **生效条件**：只有**新启动的进程**读新值 → **DSH 需重启**后快照才写入 F 盘。
+- 回滚：`[Environment]::SetEnvironmentVariable('TEMP','C:\Users\ROG\AppData\Local\Temp','User')`（TMP 同）。
+- 系统级 `C:\Windows\TEMP` **未动**（保持系统稳定）。
+
+#### （3）★ `E:\output` 根目录整理（方案 A 保守整理，已完成）
+
+| 项 | 结果 |
+|---|---|
+| 判定方法 | ripgrep 全量扫描 × 与 `1/api`、`1/docs`、`_tools`、`_scripts`、`AGENTS.md` 语料比对 |
+| **被引用（78 个，原位未动）** | `_DSH_OFFICE_STATE.md`（40 处引用）· `_SESSION_HANDOFF.md`（29）· `_AI_COMMON_RULES.md`（5）· `_PROJECT_MAP.md` · `_STARTUP_GUIDE.md` · `*_verdict.md` 等 |
+| **未被引用（161 个，已归类）** | `_reports/` **17 个**（结论报告）· `_notes/` **146 个**（调试笔记 + 两份清单） |
+| 根目录文件 | **416 → 264 个** |
+| 断链校验 | ✅ 移动前后各校验一次，**零断链** |
+| 未动 | `1/`（项目本体）· `_tl_color_cls/` · `_scripts/` · `_tools/` |
+
+★ **整理红线（实测得出，勿违）**：`1/api/traffic_light_classifier.py` **硬编码** `E:\output\_tl_color_cls\*.pt`（2 个模型权重）与 `E:\output\_scripts`；`annotation_renderer.py` **硬编码** `1\K230\…\OPPOSans 4.0.ttf` ⇒ **这三处绝对不能移动**。
+
+**★ 本轮踩的坑（已修）**：`.gitignore` 的 `_*/` 规则把新建的 `_notes/`、`_reports/` 一并忽略，导致 161 个文档只记录"删除"、未记录"新增"（远程副本一度丢失）。**教训：改 `.gitignore` 后必须用 `git check-ignore <目录>` 验证可见性。**
 
