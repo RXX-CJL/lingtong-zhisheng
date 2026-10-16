@@ -1719,3 +1719,54 @@ Move-Item 'F:\cache' 'C:\Users\ROG\.cache'
 
 **★ 迁移后验证（留给用户）**：下次打开 Trae / WorkBuddy / Qoder 时留意能否正常启动、历史与配置是否还在——**junction 对程序透明，预期无感知**；若异常，回滚写法同 §27.12(2)：删联结 → `Move-Item F:\appdata\<name> C:\Users\ROG\.<name>`。
 
+### 27.14 ★WorkBuddy 模型接入调研（2026-10-17）—— 结论：装 `dsh-connect-workbuddy`
+
+#### （1）硬数据：WorkBuddy 的模型清单（本机产品配置实读）
+
+来源：`~/.workbuddy/storage/user-<id>-personal/scoped/<hash>/wb-product-config.json`（99,528 B，`savedAt` 2026-10-17 00:07），共 **59 个模型**，每个带**积分倍率**。关键条目：
+
+| 倍率 | 模型 | 输入 | 备注 |
+|---|---|---|---|
+| **x0.00** | `hy3` / `hy3-b` / `hy3-c` | 192K | 混元思考，**免费**（国内版当前唯一免费档） |
+| **x0.00** | `step-5-preview` | 1000K | 阶跃旗舰，**免费** |
+| x0.06 | `glm-5.3-flash` | 1000K | 极便宜 |
+| **x0.11** | `deepseek-v4.1-flash` | 1000K | ★ **与我们 DSH 当前默认模型同源** |
+| x0.21 / x0.65 / x1.20 | `fast-model` / `balanced-model` / `deep-model` | 300K | WorkBuddy 抽象档（快速 / 均衡 / 极致） |
+| x0.51 | `deepseek-v4-pro` | 1000K | |
+| **x1.62** | ★★★ **`kimi-k3-1`（Kimi-K3）** | **1000K** | **全表最贵**；官方描述"复杂长程自主任务、**前端开发突出**、知识工作与科研推理" |
+
+★ `modelTiers` 显示 `glm-5.3` / `glm-5.3-flash` / `kimi-k2.8-preview` 对标准用户有"资源紧张时优先调度"限制（**`kimi-k3-1` 不在该列表**）。
+★ `endpoint = https://www.workbuddy.cn`，`deploymentType = SaaS`，`productName = WorkBuddy`。
+★ **用户情况（2026-10-17 自述）**：免费用户，**每天可领 100 积分**，积分可视化、余额充足；最看重 **Kimi-K3**。目标 = **更方便地指挥调用其它模型 + 省钱**。
+
+#### （2）插件选型：★ 选 `dingminhua/dsh-connect-workbuddy`（**不是** ★183 那个）
+
+| | **`dsh-connect-workbuddy`** ✅ 选定 | `corrinehu/dsh-workbuddy-connect` ❌ |
+|---|---|---|
+| 版本 / ★ | **4.6.5** / ★34 | 0.7.6 / ★183 |
+| **Windows** | ✅ **一等目标平台**：CI 跑 `windows-latest` 全量套件（79 文件 / **1325 测试**）+ `docs/WINDOWS.md` | ⚠️ 作者自述"**no Windows or Linux test run**" |
+| **积分显示** | ✅ **对话输入框常驻读数**（`WB CN · 1,072`）+ 点击弹余额面板（只读） | 未明确 |
+| DSH 兼容 | `0.1.7-rc.1` ~ `<0.3.0-0`，**0.2.0 全线已实测支持** | 未标注 |
+| 工程素养 | ★ 有**证据分级 A/B/C/D**、自曝 C 档结论、发版密集（4.6.3→4.6.5 同日 3 版） | 775 测试 |
+
+**兼容性核实（本机实检）**：DSH `0.2.0-rc.2` ✅ · Windows 11 26200 ✅ · Node v24.16.0（PATH）/ v24.21.0（Desktop 内置）✅ · `dsh.bundle.patch` 存在 → **可用插件页一键装** ✅ · WorkBuddy 桌面版已登录、凭据就位 ✅ · **两个插件均未安装**（环境干净）
+
+#### （3）★★ 必须记住的硬约束（否则装完必踩）
+
+上游 README 的两条实测：
+1. **限流按请求体积触发**：**约 20k 输入能过、约 30k 被拒**
+2. **上游宣称 1M 上下文，但节流线远低于此**
+
+⚠️ 而我们自己的实测是：**单次调用上下文 p50 = 368,917 token**（88.6% ≥128K，见 workspace 记忆 `agent-model-phase-sensitivity`）
+⇒ **冲突明确**：**长会话模式跑 WorkBuddy 模型会被 429 拒**
+⇒ **正确分工**：WorkBuddy（含 Kimi-K3）**只跑短上下文任务**（新开干净会话、单点问题、代码片段）；**超长上下文的活继续走 DeepSeek 官方通道**。
+
+**其它要点**：积分查询走 `https://www.codebuddy.cn/v2/billing/meter/get-user-resource`（**只读**、不耗积分）· 桌面 App 的 auth 文件**永不被写入** · 每区域随机端口 + 进程内随机 secret（真 token 不交给 pi-ai）· **不提供自动签到**（每天 100 积分需**手动点「一键签到」**）· 命令行诊断 `status` / `doctor` / `logout`
+
+#### （4）⏳ 当前进度（**下次会话接手点**）
+
+- **用户已选择 GUI 安装路径**：侧边栏 Plugins 页搜 `dsh-connect-workbuddy` → Install → Enable now → **重启 DSH**
+- **待验证（重启后由 AI 做）**：① 插件卡片是否出现 ② **输入框是否出现 `WB CN · 数字` 读数** ③ 模型选择器是否列出 `Kimi-K3 · x1.62` 等
+- **失败时**：多半是**兼容门禁**（`skippedBundles`，**只在 stderr 打印、页面无报错**）→ 用 `status` / `doctor` 诊断
+- **装成后待办**：① 定"模型分工策略"（哪个任务用哪个模型最省积分）② 提醒用户**每天手动一键签到**
+
