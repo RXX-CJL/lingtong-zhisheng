@@ -1770,3 +1770,58 @@ Move-Item 'F:\cache' 'C:\Users\ROG\.cache'
 - **失败时**：多半是**兼容门禁**（`skippedBundles`，**只在 stderr 打印、页面无报错**）→ 用 `status` / `doctor` 诊断
 - **装成后待办**：① 定"模型分工策略"（哪个任务用哪个模型最省积分）② 提醒用户**每天手动一键签到**
 
+### 27.15 ★插件配置完成 + computer-use 实操记录（2026-10-17）
+
+#### （1）✅ 全部配置完成（三级证据）
+
+| 项 | 证据 |
+|---|---|
+| 插件安装 | `dsh-connect-workbuddy@4.6.0`（23 文件，含 `bundle.patch`；profile 依赖 + bundles 已登记） |
+| 宿主运行 | `Host bundle: running (pid 26104)`；卡片页显示「运行中」 |
+| 凭据读取 | CLI `status`/`doctor`：**`CN (domestic): signed in as 刃下心`**（★ 加密凭据解密成功，昵称非 uin 数字） |
+| **积分可读** | CLI `Remaining credit: 2795.22`；卡片账号行显示 **`2,795`** |
+| **签到成功** | 点「一键签到所有账号」→ 活动记录出现 **`00:33:21 签到完成`**，积分 **2695 → 2795（+100）** |
+| **模型目录刷新** | 点「从 WorkBuddy 刷新」→ 列表从 12 个 fallback 扩成完整目录（含 `Kimi-K3`、`Kimi-K2.8-Preview`、`Kimi-K2.7-Code`、`GLM-5.3-Flash`、`Deepseek-V4-Pro`…） |
+| **Kimi-K3 已启用** | 勾选 + 保存 → 「已启用 1 个」，行内显示 `✓ 可用 (2.626s) · credit 1.23` |
+
+★ **积分有效期**：卡片显示「最近积分包 **11/05 03:20 过期**」（按插件排序规则，快过期的积分包优先使用）。
+
+#### （2）★★ 成本锚点（本轮最有价值的数据）
+
+Kimi-K3 的一次**约 2.5 万 token 探测** = **`credit 1.23`**（插件自报）。
+⇒ 换算：Kimi-K3 约 **0.49 积分 / 万 token** ⇒ **每日 100 积分 ≈ 200 万 token/天**。
+⇒ ⚠️ **而本会话累计 101M token** ⇒ 若全用 Kimi-K3 ≈ **5,050 积分**（**一天额度只够 2%**）。
+⇒ **纪律**：**长会话绝不用 Kimi-K3**；日常用免费档（`Step-5-Preview` / `Hy3` 均 **x0.00**），重要任务用便宜档（`GLM-5.3-Flash` **x0.06** / `Deepseek-V4.1-Flash` **x0.11**）。
+⚠️ 口径**待实测确认**（目前仅 1 次观察样本）。
+
+#### （3）★★ computer-use 实操教训（首次实战）
+
+**工具**：`mcp__cua-driver-mcp__*`（57 个，本会话已修复可用）
+
+**四条纪律（实测有效）**：
+1. **先 `get_window_state` 拿索引/截图**，动作后**必须复核**（截图或 `verify_state`）——「工具说已投递」≠「真的生效」。
+2. **`delivery_mode:"background"` 先试**，让 driver 决定何时必须升级。★ 实测**滚动**事件在 Chromium 上直接返回 `background_unavailable`（并明确指示改用 foreground）。
+3. ★★ **小目标必须先 `zoom`**：目测坐标在本机偏差可达 **30+ px**（复选框仅约 16px，直接目测点会**静默失败**）。`zoom` 后用 `click(from_zoom=true)` 由 driver 换算。
+4. **坐标空间**：截图被缩放（本机 2560×1600 全屏 → 截图 1500×937，比 **1.706**），driver 会自动换算，**不要自己算**。
+
+**实测的成败记录（重要）**：
+
+| 动作 | 模式 | 结果 |
+|---|---|---|
+| 点左侧「插件」导航 | background（zoom 坐标） | ✅ 成功 |
+| 勾「刃下心」复选框 | background（目测坐标） | ❌ **静默失败**（偏约 16px） |
+| 同上（zoom 修正坐标） | background | ✅ 成功 |
+| 滚动页面 | background | ❌ 工具**明确拒绝**（`Background delivery is not available … mouse_scroll`）→ 改 foreground ✅ |
+| 勾 `Kimi-K3` | background（zoom 反推坐标） | ❌ **再次静默失败**（页面重排后坐标失效） |
+| 勾 `Kimi-K3` | **foreground** | ✅ **成功** |
+| 保存模型 | foreground | ✅ 成功 |
+
+⇒ **结论**：**Chromium（Electron）内容上 background 投递不稳定**；**同一目标若 background 失败一次，直接改用 foreground**（`click`/`scroll` 均支持 `delivery_mode:"foreground"`，driver 会临时激活窗口并**恢复原前台**）。
+
+**★ 使用边界（已与用户约定）**：只读类（`health_report` / `get_screen_size` / `list_windows` / `get_window_state` / `zoom` / `get_browser_state`）可直接用；**任何产生输入或改变桌面状态的动作（click / type / scroll / launch）先取得用户同意**。
+
+#### （4）⏳ 留给用户的两件事
+
+1. **切到 WB 模型即可看到积分读数**：README 明确「用其它 provider 的模型时该读数**完全不出现**」⇒ 在模型选择器里选任一 WB 模型后，**输入框左侧会出现 `WB CN · 2,795`**（点它可看余额面板）。
+2. **每天点一次「一键签到所有账号」**（插件**刻意不做自动签到**，因签到会真实领取奖励）。
+
