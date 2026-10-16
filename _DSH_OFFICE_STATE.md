@@ -1637,3 +1637,52 @@ peer 要求随之从 `cordis ^4.0.2` 变为 `~4.0.4`（内核自带 4.0.4）—�
 
 **★ 本轮踩的坑（已修）**：`.gitignore` 的 `_*/` 规则把新建的 `_notes/`、`_reports/` 一并忽略，导致 161 个文档只记录"删除"、未记录"新增"（远程副本一度丢失）。**教训：改 `.gitignore` 后必须用 `git check-ignore <目录>` 验证可见性。**
 
+### 27.12 ★C 盘瘦身第二阶段（2026-10-16 第七轮，机器重启后）
+
+#### （1）✓ Temp 迁移已生效（三级验证）
+
+| 证据 | 内容 |
+|---|---|
+| 环境变量 | 注册表与**新进程**的 `TEMP`/`TMP` 均为 `F:\Temp` |
+| **实证（最强）** | `F:\Temp` 已出现 `dsh-workspace-changes-eCOIzC`、`dsh-acl-skill-*`、`dsh-spill-*`、`dsh-subprocess-*` ⇒ **DSH 的快照 / 沙箱 / 派生进程全部落在 F 盘** |
+| 连带生效 | `miHoYo`/`WinGet`/`ListSync` 等其他程序的临时目录也在 F 盘 ⇒ 全局生效 |
+
+**阶段④ 清 C 盘 Temp 残留**：删除 **1445 项**，回收 **0.53 GB**，C 盘 Temp 归零。
+
+#### （2）✓ `~/.cache` 已迁至 F 盘（junction，缓存未丢）
+
+| 项 | 值 |
+|---|---|
+| 迁移 | `C:\Users\ROG\.cache` → `F:\cache`（**1918.2 MB**，13.9 秒） |
+| 联结 | `New-Item -ItemType Junction`，实测 `LinkType=Junction -> F:\cache` |
+| 读取验证 | 通过 C 盘路径可见全部 6 个缓存目录（`codex-runtimes` / `puppeteer` / `chrome-devtools-mcp` …）⇒ **程序无感知，不需要重下** |
+| 选型理由 | 比"删除"更优：既省 C 盘，又不丢 1.55 GB 的 `codex-runtimes` 缓存 |
+
+**回滚**（删联结 → 移回；注意只删联结不动 F 盘内容）：
+```powershell
+Remove-Item 'C:\Users\ROG\.cache' -Force
+Move-Item 'F:\cache' 'C:\Users\ROG\.cache'
+```
+
+#### （3）C 盘瘦身总账
+
+| 阶段 | 内容 | 回收 |
+|---|---|---|
+| ① | 清旧 DSH 快照（21 个）+ 安装包缓存 | **10.7 GB** |
+| ④ | 清 C 盘 Temp 残留（1445 项） | **0.53 GB** |
+| ②′ | `~/.cache` 迁 F 盘（junction） | **1.9 GB** |
+| — | **合计** | **≈13.1 GB** |
+| **C 盘剩余** | 35.6 GB → **39.3 GB** | — |
+
+★ **根治机制**：`TEMP`/`TMP`（用户级）= `F:\Temp` ⇒ 今后 DSH 快照与所有临时文件**不再占用 C 盘**，从根上解决"快照堆积吃掉 C 盘"（本轮之前单个会话就能堆 10 GB）。
+
+#### （4）⏸ 尚未执行：阶段③（大目录迁移，需先退出对应程序）
+
+| 目标 | 大小 | 前置条件 |
+|---|---|---|
+| `~/.dsh`（DSH_HOME） | 532 MB | ⚠️ 必须**完全退出 DSH**（AI 无法自行退出，会话在其内部） |
+| `~/.trae-cn` | 606 MB | 需退出 Trae |
+| `~/.workbuddy` | 868 MB | 需退出 WorkBuddy |
+| `~/.qoder-cn` | 433 MB | 需退出 Qoder |
+| **合计** | **≈2.4 GB** | 迁移方式同为「移 F 盘 + junction」 |
+
