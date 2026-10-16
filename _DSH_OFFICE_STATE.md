@@ -1686,3 +1686,36 @@ Move-Item 'F:\cache' 'C:\Users\ROG\.cache'
 | `~/.qoder-cn` | 433 MB | 需退出 Qoder |
 | **合计** | **≈2.4 GB** | 迁移方式同为「移 F 盘 + junction」 |
 
+### 27.13 ★阶段③执行结果（2026-10-16 第七轮续）—— 三个 App 数据已迁 F 盘
+
+**用户操作**：关闭 Trae / WorkBuddy / Qoder（DSH 保持运行）。
+
+| 目录 | 结果 | 耗时 | 备注 |
+|---|---|---|---|
+| `~/.trae-cn`（606.4 MB） | ✅ `Junction -> F:\appdata\trae-cn` | 21.8 s | `Move-Item` 一次成功 |
+| `~/.qoder-cn`（434.1 MB） | ✅ `Junction -> F:\appdata\qoder-cn` | 10.9 s | 同上 |
+| `~/.workbuddy`（868.3 MB） | ✅ `Junction -> F:\appdata\workbuddy` | 11.6 s | ⚠️ 见下 |
+
+**★ WorkBuddy 的波折与正确姿势（重要经验）**：
+- 首次 `Move-Item` **中途失败**（`Access to the path is denied`）→ 源被删了一部分、目标留半成品（**源 312.4 MB + 目标 733.8 MB**）；而按进程名**找不到任何占用者**（疑为杀软实时扫描或后台服务临时锁）。
+- **正确补救 = `robocopy /E /MOVE /R:2 /W:2`**：**续传**剩余 14,644 文件、**0 FAILED**、退出码 3（成功），确认源被清空后才建 junction ⇒ **数据无损**。
+- ⚠️ **新纪律**：跨盘搬大目录**别用 `Move-Item`**（无续传、失败即半成品），**直接用 `robocopy /MOVE`**（可重试/可续传/有 FAILED 计数）。
+
+**★ C 盘瘦身最终总账**：
+
+| 阶段 | 内容 | 回收 |
+|---|---|---|
+| ① | 清 21 个旧 DSH 快照 + 安装包缓存 | 10.7 GB |
+| ④ | 清 C 盘 Temp 残留 1445 项 | 0.53 GB |
+| ②′ | `~/.cache` → `F:\cache`（junction） | 1.9 GB |
+| ③ | `~/.trae-cn` + `~/.qoder-cn` + `~/.workbuddy` → `F:\appdata\*` | 1.9 GB |
+| | **合计** | **≈15.0 GB** |
+| **C 盘剩余** | **35.6 GB → 41.3 GB** | — |
+
+**⏸ 唯一未迁：`~/.dsh`（DSH_HOME，532 MB）—— 建议不做**：
+- **收益小**（532 MB，仅占已回收量的 3.5%）；
+- **风险大**：它是 DSH 核心数据（profile / 插件 node_modules / 会话 / 记忆 / 凭据），一旦 junction 出问题 DSH 可能起不来，而迁移**必须在 DSH 完全退出时**进行（届时无任何 AI 在场，出错只能靠用户手动救援）；
+- **决策：保持现状**。若将来 C 盘再吃紧再议，届时可做一个"检测 DSH 未运行 → 移动 → 建联结 → 失败自动回滚"的双击脚本。
+
+**★ 迁移后验证（留给用户）**：下次打开 Trae / WorkBuddy / Qoder 时留意能否正常启动、历史与配置是否还在——**junction 对程序透明，预期无感知**；若异常，回滚写法同 §27.12(2)：删联结 → `Move-Item F:\appdata\<name> C:\Users\ROG\.<name>`。
+
