@@ -1851,3 +1851,44 @@ Kimi-K3 的一次**约 2.5 万 token 探测** = **`credit 1.23`**（插件自报
 **❌ 明确不适用**：需要**反复微调、依赖即时反馈**的活（拖拽调参、看动画/画面效果、连续操作）——这类**交给用户（人眼 + 手感）远优于交给 AI**。
 **★ 纪律**：**只要目标有 API/CLI，就不要用 computer-use**；启动 GUI 操作前先问一句"这件事有没有命令行/接口路径"。
 
+### 27.16 ★DSH 专属技能池建立（2026-10-17）—— 不再依赖 Trae
+
+**背景**：用户裁定「（Trae）技能池是我误导的，可以忽略它」，要求按 DSH 自身能力重建一套。
+
+**★ 三条实测结论（三级证据）**：
+
+| # | 结论 | 证据 |
+|---|---|---|
+| ① | **`~/.dsh/skills` 是有效技能根**（用户级 rank 400，优先级高于 `~/.agents/skills` 的 500） | 写入探测技能 → 会话技能目录 **3 秒内自动出现** |
+| ② | **技能根是热加载的**（增删双向、无需重启） | 探测技能出现 → 删除后目录同步消失 |
+| ③ | **`skill` 工具可正常加载**（§27.7 的故障已不复现） | `skill(dsh-selftest-probe)` 返回正文成功 |
+
+**技能根全景**（源码实读 `E:\deepseek-harness\packages\skill\skill-filesystem\src\index.ts`）：
+项目 `.dsh/skills`(100) → 项目 `.agents/skills`(200) → custom(300) → **`~/.dsh/skills`(400)** → `~/.agents/skills`(500) → 内置 `resources\runtime\office-skills`（Desktop 自带 office-docx/pptx/xlsx 三件）。
+
+**已建立（v1，3 个自研技能，均在 `C:\Users\ROG\.dsh\skills\`）**：
+
+| 技能 | 覆盖 |
+|---|---|
+| `dsh-office-ops` | 办公室运维：patch 层规范 / 插件装卸 / 重启与救援 / 磁盘 junction 纪律 / 文档落点 / 诊断套路 |
+| `dsh-delegation-channels` | 算力路由：本地模型档位（含 WB 免费档/便宜档/Kimi-K3）+ 4 条 CLI 通道 + 传话通道 + 成本纪律 |
+| `zht-project-playbook` | 智瞳项目手册：端口 / 校验三字段 / 素材口径 / 读状态坑 / CARLA 硬知识 |
+
+**★ 未动 Trae 资产**：`~/.agents/skills` 67 项原样保留（其中 **57 个 junction → `C:\Users\ROG\.trae-cn\skills\*`**，另 10 个实体目录）。新技能与之并存，同名时新池（rank 400）胜出。
+
+**回滚**：删除 `C:\Users\ROG\.dsh\skills\<技能名>` 目录即可（热加载，双向生效）。
+
+### 27.17 ★dshmarket「一键重启」在 Desktop 上不可开（2026-10-17 源码级定案）
+
+用户要求「纳入考虑」→ 读源码后定案：**上游硬编码禁止，profile patch 开不了**。
+
+| 分支 | 代码位置 | 结论 |
+|---|---|---|
+| 普通 DSH（CLI/web） | `lib/index.js:263` → `allowRestart: config?.allowRestart` | profile patch **有效** |
+| **本机（anywhere-labs Desktop，走 `desktopPnpm`）** | `lib/index.js:302-308` → `desktopHost: true, allowRestart: false` **硬编码** | ❌ **开不了** |
+| 官方 Desktop | `lib/index.js:~221` → `allowRestart: false` | 同上 |
+
+- 上游注释原文：「Relaunching a raw Electron process would bypass Desktop's launcher lifecycle. **The shell remains responsible for restart in this mode.**」
+- 实测佐证：`GET /dsh-market/status` → `"restart":false`；且 `settingsNamespace: "unsupported-by-host"`（设置页开关也不可用）
+- **替代路径（已就绪）**：`E:\output\_tools\restart-desktop.bat`（双击即用；先 `taskkill`（WM_CLOSE 优雅关闭）→ 超时 12 秒再强杀 → 重新启动；**必须脱离 DSH 进程树**运行，否则会自杀）
+
