@@ -8,6 +8,12 @@
 > ★ **共享技能池 `C:\Users\ROG\.agents\skills` 被 Qoder CLI 原生复用（实测 67/67 自动加载）**。
 > 入口：**`E:\output\_DSH_OFFICE_STATE.md` §1.3 / §1.4** + `E:\output\qoder_cli_channel_verdict.md`；派活工具 `E:\output\_tools\qoder.ps1`。
 > **智瞳项目本身的进度不受影响**（下方第七轮内容仍然有效）。
+>
+> **🆕 更近一轮（2026-10-17，仍是"办公室/工具链"，未触碰 `1/` 项目代码）**：**DSH 专属技能池建立** ——
+> 新建 `C:\Users\ROG\.dsh\skills`（**热加载**，实测写入 3 秒生效；3 个自研技能：`dsh-office-ops` / `dsh-delegation-channels` / `zht-project-playbook`）；
+> **dshmarket 一键重启在 Desktop 上不可开**（源码级定案：`allowRestart:false` 硬编码）→ 替代脚本 `E:\output\_tools\restart-desktop.bat`（双击即用）。
+> 入口：**`_DSH_OFFICE_STATE.md` §27.16 / §27.17**。
+> **遗留（新会话可直接接手）**：① 技能池是否继续扩展（候选：`windows-safe-fileops` / `dsh-env-forensics` / `zht-demo-runbook`）② 重启脚本首次实测（建议用户空闲时双击一次）。
 
 > **用途**：新会话开场读这份 + `_PROJECT_MAP.md`，即可接上进度。
 > **本文件只记"现在在哪、下一步做什么"**，不记过程与流水账（协议 §9.2）。
