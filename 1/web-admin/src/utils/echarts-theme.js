@@ -1,53 +1,71 @@
 /**
- * ECharts 主题：智瞳深色（2026-10-03 由 DSH 新增）
- * 设计语言参考 Mineradio：近黑底 + 电光蓝强调 + 极细描边
+ * ECharts 主题：智瞳亮色 zt-light（2026-10-23 由 DSH 重写）
+ *
+ * 变更原因（决策 3 选 A）：
+ *   原文件是深色主题 zt-dark（backgroundColor 近黑 #12151A），
+ *   与 src/styles/design-tokens.css 的亮色体系（--zt-bg:#F6F7F9 / --zt-surface:#FFFFFF）冲突；
+ *   且 Dashboard.vue 三处 echarts.init 从未传主题参数 —— 该文件历史上**从未生效**。
  *
  * 用法：
- *   import { ztDarkTheme } from '@/utils/echarts-theme'
- *   chart.setOption(option, true)   // 或在 init 时注册主题
+ *   import { registerZtTheme } from '@/utils/echarts-theme'
+ *   registerZtTheme(echarts)                        // 注册一次
+ *   echarts.init(el, ZT_THEME_NAME)                 // 之后凡是图表都传第二个参数
+ *
+ * 颜色基准全部取自 design-tokens.css，改主题前先改令牌。
  */
 
+export const ZT_THEME_NAME = 'zt-light'
+
 export const ZT_THEME = {
-  // 配色：与 design-tokens.css 的深色语义色一致
-  color: ['#3B5BFF', '#34D399', '#FBBF24', '#F87171', '#22D3EE', '#A78BFA'],
+  // 分类色：与 design-tokens.css 语义色一致，暖=危险 / 冷=静态
+  color: ['#D14343', '#ED7D31', '#F2C14E', '#9B5DE5', '#2E9E8F', '#5B8DB8', '#98A2B3', '#4C7A9E'],
   backgroundColor: 'transparent',
   textStyle: {
-    fontFamily: 'Inter, "Microsoft YaHei", "PingFang SC", sans-serif'
+    fontFamily: 'Inter, -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif'
   },
   title: {
-    textStyle: { color: '#E8ECEF', fontWeight: 600, fontSize: 14 },
-    subtextStyle: { color: '#8A9099', fontSize: 12 }
+    textStyle: { color: '#101828', fontWeight: 600, fontSize: 14 },
+    subtextStyle: { color: '#98A2B3', fontSize: 12 }
   },
   legend: {
-    textStyle: { color: '#C3C9D0', fontSize: 12 },
-    inactiveColor: '#5A6070'
+    textStyle: { color: '#475467', fontSize: 12 },
+    inactiveColor: '#C0C4CC',
+    itemWidth: 10,
+    itemHeight: 10,
+    itemGap: 12
   },
   tooltip: {
-    backgroundColor: 'rgba(18,21,26,0.96)',
-    borderColor: '#2E343D',
+    backgroundColor: 'rgba(255,255,255,0.98)',
+    borderColor: '#E4E7EC',
     borderWidth: 1,
-    textStyle: { color: '#E8ECEF', fontSize: 12 },
+    padding: [8, 12],
+    textStyle: { color: '#101828', fontSize: 12 },
+    extraCssText: 'box-shadow: 0 4px 12px rgba(16,24,40,0.08); border-radius: 8px;',
     axisPointer: {
-      lineStyle: { color: '#3E4652' },
-      crossStyle: { color: '#3E4652' }
+      lineStyle: { color: '#E4E7EC' },
+      crossStyle: { color: '#E4E7EC' },
+      shadowStyle: { color: 'rgba(29,78,216,0.05)' }
     }
   },
   grid: {
-    borderColor: '#22272F',
+    borderColor: '#E4E7EC',
     containLabel: true,
-    left: 12, right: 16, top: 32, bottom: 8
+    left: 12,
+    right: 16,
+    top: 32,
+    bottom: 8
   },
   categoryAxis: {
-    axisLine: { lineStyle: { color: '#2E343D' } },
-    axisTick: { lineStyle: { color: '#2E343D' } },
-    axisLabel: { color: '#98A2B3', fontSize: 11 },
-    splitLine: { show: false, lineStyle: { color: ['#1E232B'] } }
+    axisLine: { lineStyle: { color: '#E4E7EC' } },
+    axisTick: { lineStyle: { color: '#E4E7EC' } },
+    axisLabel: { color: '#606266', fontSize: 12 },
+    splitLine: { show: false }
   },
   valueAxis: {
-    axisLine: { show: false, lineStyle: { color: '#2E343D' } },
+    axisLine: { show: false },
     axisTick: { show: false },
     axisLabel: { color: '#98A2B3', fontSize: 11 },
-    splitLine: { lineStyle: { color: ['#1E232B'], type: 'dashed' } }
+    splitLine: { lineStyle: { color: ['#F0F2F5'], type: 'dashed' } }
   },
   line: {
     symbolSize: 6,
@@ -56,26 +74,29 @@ export const ZT_THEME = {
     itemStyle: { borderWidth: 0 }
   },
   areaStyle: { opacity: 0.18 },
-  pie: {
-    itemStyle: { borderColor: '#12151A', borderWidth: 2 },
-    label: { color: '#C3C9D0', fontSize: 11 },
-    labelLine: { lineStyle: { color: '#3E4652' } }
+  bar: {
+    // 条形图圆角在 Dashboard 里按方向单独设置，这里只放通用
+    itemStyle: { borderRadius: 3 }
   },
-  // 深色下"视觉映射/数据缩放"的样式
-  visualMap: { textStyle: { color: '#C3C9D0' } },
+  pie: {
+    itemStyle: { borderColor: '#FFFFFF', borderWidth: 2 },
+    label: { color: '#475467', fontSize: 12 },
+    labelLine: { lineStyle: { color: '#CDD3DC' } }
+  },
+  visualMap: { textStyle: { color: '#475467' } },
   dataZoom: {
     textStyle: { color: '#98A2B3' },
-    borderColor: '#2E343D',
-    fillerColor: 'rgba(59,91,255,0.16)',
-    handleStyle: { color: '#3B5BFF' },
-    dataBackground: { lineStyle: { color: '#3E4652' }, areaStyle: { color: '#252B36' } }
+    borderColor: '#E4E7EC',
+    fillerColor: 'rgba(29,78,216,0.10)',
+    handleStyle: { color: '#1D4ED8' },
+    dataBackground: { lineStyle: { color: '#E4E7EC' }, areaStyle: { color: '#F6F7F9' } }
   }
 }
 
-/** 供 ECharts init 使用：把主题对象注册到 echarts */
+/** 把亮色主题注册到 echarts（幂等，重复调用安全） */
 export function registerZtTheme(echarts) {
   if (!echarts || !echarts.registerTheme) return false
-  echarts.registerTheme('zt-dark', ZT_THEME)
+  echarts.registerTheme(ZT_THEME_NAME, ZT_THEME)
   return true
 }
 

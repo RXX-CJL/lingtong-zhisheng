@@ -609,12 +609,8 @@ const DIRECTION_CN = {
   down: '向下',
   unknown: '未知'
 }
-const EXTRA_TYPE_CN = {
-  illegal_park: '违规停车',
-  lane_departure: '压线行驶',
-  running_yellow: '抢黄灯',
-  illegal_turn: '违规掉头'
-}
+// 违规类型中文名已统一到 utils/format.js 的 TYPE_MAP（2026-10-23 由 DSH 删除本地映射补丁）
+// 历史教训：这里曾用 4 条局部映射掩盖 format.js 缺 5 类的根因，导致其他页面仍漏英文
 
 const route = useRoute()
 const router = useRouter()
@@ -1014,10 +1010,10 @@ const ruleJudgment = computed(() => {
 
 // ==================== 分析回放：车辆信息面板（事件级） ====================
 
-// 违规中文名：优先 utils/format.js 的 TYPE_MAP，再用内联兜底，最后原样返回
+// 违规中文名：统一走 utils/format.js 的 TYPE_MAP，未登记由 getTypeName 兜成「未知类型」
 const violationCN = computed(() => {
   const t = detail.value?.event_type || ''
-  return getTypeName(t) !== t ? getTypeName(t) : (EXTRA_TYPE_CN[t] || t || '-')
+  return getTypeName(t)
 })
 
 // 车辆类型中文

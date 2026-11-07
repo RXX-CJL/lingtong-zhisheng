@@ -265,6 +265,37 @@ body {
   background: var(--zt-primary-soft);
 }
 
+/* ============================================================================
+ * 卡片统一语言（2026-10-23 由 DSH 新增）
+ * 目的：全站 el-card 默认是 EP 原生样式（16px 圆角未统一、表头 4px 阴影过硬），
+ *       与 .zt-kpi 的 12px 圆角 + 极细描边语言不一致，页面上混着两套"卡片"。
+ *       这里把 el-card 一并令牌化，所有页面自动受益，无需逐页改 scoped 样式。
+ * ========================================================================= */
+.el-card {
+  border-radius: var(--zt-radius-lg);
+  border-color: var(--zt-border);
+  box-shadow: var(--zt-shadow-xs);
+  transition: box-shadow var(--zt-dur) var(--zt-ease),
+              border-color var(--zt-dur) var(--zt-ease);
+}
+.el-card:hover {
+  box-shadow: var(--zt-shadow-sm);
+}
+.el-card__header {
+  border-bottom: 1px solid var(--zt-border);
+  font-weight: 600;
+  color: var(--zt-text);
+}
+.el-card__body {
+  color: var(--zt-text-secondary);
+}
+
+/* 图表容器统一留白：ECharts 自身 grid 之外再给一点呼吸感 */
+.zt-chart-box {
+  width: 100%;
+  min-height: 200px;
+}
+
 /* 尊重用户降低动效偏好（无障碍要求） */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

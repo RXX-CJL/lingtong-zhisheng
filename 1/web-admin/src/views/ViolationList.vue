@@ -334,7 +334,30 @@ function getLocationText(row) {
   if (row?.position) {
     try {
       const pos = typeof row.position === 'string' ? JSON.parse(row.position) : row.position
-      if (pos) return `x:${pos.x}, y:${pos.y}`
+      // 后端实测只会给 {bbox, center_x, center_y}，不存在 x/y（见 routers/realtime.py:637 _by_point 的兼容口径）。
+      // 兼容顺序与后端保持一致，避免两边各判一套。
+      if (pos) {
+        let px = null
+        let py = null
+        for (const [kx, ky] of [['x', 'y'], ['center_x', 'center_y'], ['cx', 'cy'], ['point_x', 'point_y']]) {
+          if (pos[kx] != null && pos[ky] != null) {
+            px = Number(pos[kx])
+            py = Number(pos[ky])
+            break
+          }
+        }
+        // 再退一级：由 bbox 求中心点
+        if (px == null || Number.isNaN(px) || Number.isNaN(py)) {
+          const bb = pos.bbox || pos.target_bbox
+          if (Array.isArray(bb) && bb.length >= 4) {
+            px = (Number(bb[0]) + Number(bb[2])) / 2
+            py = (Number(bb[1]) + Number(bb[3])) / 2
+          }
+        }
+        if (px != null && !Number.isNaN(px) && !Number.isNaN(py)) {
+          return `x:${Math.round(px)}, y:${Math.round(py)}`
+        }
+      }
     } catch {}
   }
   return '-'

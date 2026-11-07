@@ -78,6 +78,7 @@ import { ref, onMounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { getStatisticsOverview, getDailyStats, getTypeDistribution } from '../api'
 import { getTypeName, getStatusName } from '../utils/format'
+import { registerZtTheme, ZT_THEME_NAME } from '../utils/echarts-theme'
 import CollabStats from './CollabStats.vue'
 
 const activeTab = ref('overview')
@@ -177,14 +178,15 @@ async function loadData() {
 }
 
 function initCharts() {
+  registerZtTheme(echarts)
   if (barChartRef.value) {
-    barChart = echarts.init(barChartRef.value)
+    barChart = echarts.init(barChartRef.value, ZT_THEME_NAME)
   }
   if (pieChartRef.value) {
-    pieChart = echarts.init(pieChartRef.value)
+    pieChart = echarts.init(pieChartRef.value, ZT_THEME_NAME)
   }
   if (areaChartRef.value) {
-    areaChart = echarts.init(areaChartRef.value)
+    areaChart = echarts.init(areaChartRef.value, ZT_THEME_NAME)
   }
 
   window.addEventListener('resize', () => {
