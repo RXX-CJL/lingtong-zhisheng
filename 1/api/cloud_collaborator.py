@@ -345,6 +345,38 @@ class CloudCollaborator:
         doubao = cloud_result.get('doubao_result', {}) or {}
         deepseek = cloud_result.get('deepseek_result', {}) or {}
 
+        # ★2026-11-07 由 DSH 新增：把 judgment 字符串归一成三个 bool 字段。
+        #
+        # 为什么必须加（实测事故，有库内证据）：
+        #   下游全部按 `is_violation_confirmed` / `is_uncertain` 读，
+        #   而 image_recognizer 的 analyze_with_doubao / analyze_with_deepseek_judge
+        #   实际返回的是 `judgment` 字符串（"confirmed"/"rejected"/"uncertain"），
+        #   那两个 bool 字段**根本不在返回 dict 里**（.get 永远拿到 False）。
+        #
+        #   实测铁证（traffic_events.id=3946, lane_departure）：
+        #     doubao   -> judgment="rejected"  conf=0.95  （"5帧中车辆始终在车道内，未压线"）
+        #     deepseek -> judgment="rejected"  conf=0.05  （"未压线，可撤销违规判定"）
+        #     两个模型**都判无违规**，最终却算出 final=uncertain。
+        #   根因就是这里：bool 字段缺失 -> primary_confirmed=False、
+        #   primary_uncertain=False -> 落到 else 分支被判 rejected，
+        #   但 pending_review 又因其他条件为真 -> 被上层改写成 uncertain。
+        #
+        # 归一规则：只补缺，不覆盖已有值（保持向后兼容）。
+        def _normalize_judgment(r: Dict[str, Any]) -> Dict[str, Any]:
+            if not isinstance(r, dict):
+                return {}
+            j = str(r.get('judgment') or '').strip().lower()
+            out = dict(r)
+            if 'is_violation_confirmed' not in out:
+                out['is_violation_confirmed'] = (j in ('confirmed', 'violation', 'confirmed_violation'))
+            if 'is_uncertain' not in out:
+                out['is_uncertain'] = (j in ('uncertain', 'pending_review', 'unknown', ''))
+            return out
+
+        claude = _normalize_judgment(claude)
+        doubao = _normalize_judgment(doubao)
+        deepseek = _normalize_judgment(deepseek)
+
         primary_visual = claude if claude.get('success', False) else doubao
         primary_confirmed = bool(primary_visual.get('is_violation_confirmed', False))
         primary_uncertain = bool(primary_visual.get('is_uncertain', False))
@@ -1112,12 +1144,32 @@ class CloudCollaborator:
                               else (doubao_result or {}))
             # 任一必要模型失败都不能把本地“疑似违规”伪装成云端已确认或已排除。
             # 应转人工复核，尤其避免 API 失败被 bool 默认值误当成 rejected。
+            #
+            # ★2026-11-07 由 DSH 补：这里也要归一 judgment -> bool 字段。
+            #   实测 id=3946：豆包与 DeepSeek 都返回 judgment="rejected"，
+            #   但本函数用 is_violation_confirmed 读，缺失 -> 双 False -> uncertain。
+            def _norm(r):
+                if not isinstance(r, dict):
+                    return {}
+                j = str(r.get('judgment') or '').strip().lower()
+                o = dict(r)
+                if 'is_violation_confirmed' not in o:
+                    o['is_violation_confirmed'] = (j in ('confirmed', 'violation', 'confirmed_violation'))
+                if 'is_uncertain' not in o:
+                    o['is_uncertain'] = (j in ('uncertain', 'pending_review', 'unknown', ''))
+                return o
+
+            _claude_n = _norm(claude_result)
+            _doubao_n = _norm(doubao_result)
+            _deepseek_n = _norm(deepseek_result)
+            primary_result = (_claude_n if _claude_n.get('success', False) else _doubao_n)
+
             cloud_result = {
-                'claude_result': claude_result or {},
-                'doubao_result': doubao_result or {},
-                'deepseek_result': deepseek_result or {},
+                'claude_result': _claude_n,
+                'doubao_result': _doubao_n,
+                'deepseek_result': _deepseek_n,
                 'pending_review': (not primary_result.get('success', False)) or
-                                  (not (deepseek_result or {}).get('success', False)),
+                                  (not _deepseek_n.get('success', False)),
             }
             # local_result：本地规则判断（事件触发时已认定疑似违规）
             primary = primary_result

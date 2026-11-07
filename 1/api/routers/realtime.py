@@ -79,6 +79,21 @@ def start_detection(request: StartDetectionRequest):
                     },
                     status_code=409,
                 )
+        elif cur_src == "video":
+            # ★2026-11-07 由 DSH 修复（BUG-3 的 video 分支，实测踩到）：
+            #   上面只对 carla 做了跳过，video 落到 else -> start_camera(video_path=None)
+            #   -> classify_source(None) 判成 camera -> 转而打开本机摄像头。
+            #   实测证据：/source{video, video_path:X} 返回 success=true，
+            #             /status 却报 source_type=camera、tracked_vehicle_count=0。
+            #   修法：当前源已是 video 且已记住路径时，用记住的路径重开视频，
+            #        而不是退化成摄像头。路径为空才回落到摄像头。
+            _vp = getattr(realtime_detector, "video_path", None)
+            if _vp:
+                realtime_detector.start_camera(
+                    request.camera_index, _vp)
+            else:
+                realtime_detector.start_camera(
+                    request.camera_index, request.video_path)
         else:
             realtime_detector.start_camera(request.camera_index, request.video_path)
         result = realtime_detector.start_detection()

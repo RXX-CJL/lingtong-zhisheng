@@ -291,6 +291,20 @@ class RealtimeViolationDetector:
         # M17: 数据源类型（camera / video / carla）与 CARLA 实例
         self.source_type = "camera"
         self.carla_source = None
+        # ★2026-11-07 由 DSH 新增：记住当前视频源路径。
+        #
+        # 为什么需要（实测事故）：
+        #   `POST /source {source_type:video, video_path:X}` 会调 start_camera(video_path=X)
+        #   把源打开，但**没有把 X 存下来**。随后 `POST /start` 时：
+        #       cur_src = self.source_type  -> "video"
+        #       而 routers/realtime.py 的 /start 只对 "carla" 做了跳过，
+        #       video 落到 else 分支 -> start_camera(camera_index, video_path=None)
+        #       -> classify_source(None) 判成 "camera" -> 转而打开本机摄像头。
+        #   实测证据：/source{video} 返回 success=true，
+        #             /status 却报 source_type=camera、tracked_vehicle_count=0。
+        #   这和 2026-11-07 修的 BUG-3（carla 被 /start 覆盖成 camera）是**同一个病根**，
+        #   当时只补了 carla 一个分支，video 漏了。
+        self.video_path = None
         self.web_socket_clients = []
         self.digital_twin_clients = []
         self.last_detection_result = None
@@ -949,6 +963,13 @@ class RealtimeViolationDetector:
             else:
                 # camera / video 走原逻辑
                 self.source_type = source_type
+                # ★2026-11-07 由 DSH 新增：video 源必须把路径存下来，
+                # 否则后续 /start 再调 start_camera(video_path=None) 会退化成开摄像头。
+                # （实测：/source{video} 成功但 /status 报 camera，就是这个原因）
+                if source_type == "video":
+                    self.video_path = video_path
+                else:
+                    self.video_path = None
                 self.start_camera(camera_index=camera_index, video_path=video_path)
                 return True
 
