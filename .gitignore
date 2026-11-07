@@ -93,3 +93,5 @@ dsh-workshop-src-recovered/
 # 8) AI 协作临时产物与运行时状态（2026-11-07 追加）
 /.workbuddy/
 /handoff/.bus/
+# 9) handoff/main.md 由 handoff-gen 每 2 分钟自动重写（2026-11-07）
+/handoff/main.md
