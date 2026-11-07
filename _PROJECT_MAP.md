@@ -1,6 +1,6 @@
 # 智瞳灵声 · 项目能力清单（_PROJECT_MAP.md）
 
-> 最后更新: **2026-10-10（第七轮：标定热重载 + 绘制侧 ROI 过滤 + 检测类白名单）** / 维护规则见 `_DSH_WORK_PROTOCOL.md` §4.4
+> 最后更新: **2026-10-23（管理端前端图表 T50-T53 已全部修复并三级验收：中文映射收敛为单一来源 / 环形→横向排序条形 / echarts 亮色主题生效 / 排行卡换审核状态分布）** / 维护规则见 `_DSH_WORK_PROTOCOL.md` §4.4
 > 本文件用途：新 AI **先读 `E:\output\_AI_COMMON_RULES.md`，再读本文件**，5 分钟内了解项目已有能力，避免重复造轮子。
 >
 > **证据等级标注**：`[一]` = 命令结果 / `[二]` = 文件状态 / `[三]` = 真实行为（最强）。未标注者为代码静态阅读所得（介于一级与二级之间）。
@@ -105,6 +105,11 @@
 | `diag_frame.py` | 拉流取帧诊断（urllib） | — | 无引用，手工运行 | 2.2 KB / 2026-07-29 |
 | `create_test_image.py` / `submit_test_images.py` | 造测试图 / 批量提交测试图 | — | 无引用，手工运行 | 1.1 KB / 3.4 KB |
 | `test_api.py`、`test_camera.py`、`test_claude_integration.py`、`test_integration.py`、`test_parser_logic.py`、`test_realtime.py`、`test_recognizer.py`、`test_stream_api.py`、`test_task010.py`、`test_traffic_light_vehicle.py` | 手工测试脚本（11 个） | — | 无引用；**正式测试在 `1/tests/`（pytest）** | — |
+
+> **另有「演示素材生产线」（不属于项目本体，2026-10-17 用户明确）**：
+> `E:\output\1\carla\CARLA_0.9.16\PythonAPI\examples\carla_creator_workshop.py`（2111 行）
+> —— CARLA 可视化摆车 / 行为模式 / 红绿灯配时 / 道具 / 1080p 录制；入口 `E:\output\1\carla\启动CARLA创造工坊.bat`。
+> 结论、硬坑（K1/K2）与未做项见 **`E:\output\_carla_sim_tooling_verdict.md` §13–§14**。
 
 ### 2.4 路由模块（`api/routers/`）
 
@@ -311,6 +316,15 @@
 ## 五、★已知陷阱（改代码前必读）
 
 > 全部为代码注释 / 已归档报告中的**实测记录**，不是推测。
+
+### 5.0 ★管理端前端图表（2026-10-23 新增）
+
+| # | 陷阱 | 证据 |
+|---|---|---|
+| **T50** | ✅**已于 2026-10-23 修复**（format.js TYPE_MAP 6→12 key + 未映射兜底「未知类型」+ console.warn；EventDetail.vue 删本地补丁）。历史记录：**中文类型名有 5 套映射表各自为政，前端 `TYPE_MAP` 只有 6 类，后端能产出 10-11 类** → 未覆盖的类型会在界面上**直接显示英文 key**（实测仪表盘出现 `running_yellow`、截断成 `ing_yellow`）。根因文件 `web-admin/src/utils/format.js:1-8`。**修前端局部补丁无效**（`EventDetail.vue:612` 的 `EXTRA_TYPE_CN` 就是历史遗留的局部补丁），必须修 `format.js` 根因并加"未映射兜底"（禁止英文外露）。 | `_ui_optimization_verdict.md` §1.4；三模型独立评审一致 |
+| **T51** | ✅**已于 2026-10-23 修复**（类型分布改横向排序条形图，yAxis.inverse:true 最大值置顶，条尾标百分比，删图例）。历史记录：**饼图/环形图在 400×250 卡片里最多装 5-6 类，超过必然标签重叠**。当前仪表盘 7 类塞环形 + `avoidLabelOverlap:false` + 底部 7 项图例折行 → 实测 3 处标签压叠 + 环形被裁切。**这是选型错误，调参救不回来**（三模型独立判定一致）。正解：换成**横向排序条形图**（类目走 Y 轴、条尾直接标百分比、删图例）。 | `_ui_optimization_verdict.md` §2.2-2.5；本地设计库 `charts.csv` 规则 No.3（Pie 限 ≤5 类） |
+| **T52** | ✅**已于 2026-10-23 修复**（echarts-theme.js 重写为亮色 zt-light，Dashboard 三处 echarts.init(el, 'zt-light')；Statistics.vue 三处 init 仍未传主题，属既有不一致，见 G16）。历史记录：**`web-admin/src/utils/echarts-theme.js` 定义的主题从未生效**：`Dashboard.vue` 三处 `echarts.init(el)` 均**未传主题参数**。且该主题是**深色**体系，而 `styles/design-tokens.css` 是**亮色**体系（`--zt-bg:#F6F7F9`）—— 两套设计语言并存。改图表前先确认配色基线。 | `Dashboard.vue:341,357,368`；`echarts-theme.js:10-73` vs `design-tokens.css:21-49` |
+| **T53** | ✅**已于 2026-10-23 处理**（决策 1 选 A：该卡改为「审核状态分布」环形图，数据取接口已有 by_status，零后端改动）。历史记录：**仪表盘"设备违规排行 TOP10"卡从无数据源**：全项目 grep `by_device` **仅 1 处命中**，且是前端自己读 `stats.value.by_device \|\| []` 的空兜底；`api/routers/statistics.py:93-100` 返回体**没有** `by_device` 字段。**它不是故障，是设计时就没做的空壳**。要让它有数据必须后端新增聚合（join 设备表）。 | `_ui_optimization_verdict.md` §1.3 |
 
 ### 5.1 颜色与通道
 
@@ -535,6 +549,9 @@
 | G13 | **规则引擎双实现** | 违规判定同时存在 `violation_rules.ViolationRuleEngine`（6 类）与 `behavior_engine.BehaviorEngine`（8 类）+ `rule_engine/plugins/traffic_plugin`（包装前者）。实时链路**两条都跑**（`realtime_detector.py:130-131`），语义重叠但类型集合不同（behavior 多出抢黄灯/违规掉头/未礼让行人）。 | `realtime_detector.py:130-131`、`:955-967` | 明确"谁是权威判定"，避免后人只改一处 |
 | **G14** | **★坏"真值"污染了 6 次修复（2026-10-06 定位并已建立替代验证）** | `E:\output\_dual_cam_demo\ground_truth_dual.csv` 的 `cam1_u/cam1_v` 是 `_dual_cam_demo.py:217/231` 里 `Proj.project()` 的**模型输出**，而该 `Proj` 的相机基不正交（`fwd·up=0.73`）。围绕它写的验证脚本（`_debug_homography.py`、`_verify_homography*.py`、`_unproject_numeric.py`、`_compare_two_impls.py`、`_check_projection_consistency.py`、`_quantify_old_model.py`）**结论全部作废**。 | `[一]` 同参数重算 580 行 u 中位误差 0.51 px；`_speed_calibration_verdict.md` §二 | CSV 的 `(x,y)` 保留为真值、像素列作废；本轮已建立 `_validate_speed_calibration.py`（真实帧）与 `_carla_calibration_markers.py`（物理级） |
 | **G15** | **★第二道静默丢弃（2026-10-06 已修）** | `realtime_detector.py:805-823` 合并人工标注时**手工逐个字段 copy**，只拷了 8 个字段 → `camera_height_m/camera_pitch_deg/fov_deg/lane_width_px/...` 即使存进 scene 也到不了 `SpeedCalibrator`，超速换算永远落回 `assumed`（不报错、也不判超速）。 | `[一]` 白名单存-取往返测试 + 静态核对 | 已改为成组拷贝；新增标定字段时**两处同步**（见 T42） |
+
+| **G16** | **前端图表主题仍不一致** | 本轮已把 `utils/echarts-theme.js` 重写为亮色 `zt-light`，并在 `Dashboard.vue` 三处 `echarts.init(el, 'zt-light')` 生效。但 `Statistics.vue:181,184,187` 三处 `echarts.init` **仍未传主题参数**，该页图表走 ECharts 默认色板 —— 与全站亮色令牌不一致。**本轮未改（超出 F1-F10 授权范围）**。 | `Statistics.vue:181,184,187`；`Dashboard.vue:450,485,504` | 下一轮把三处补上第二参数即可（主题已注册，改一行） |
+| **G17** | **★既有 bug：违规列表"设备位置"列显示 `x:undefined, y:undefined`** | `ViolationList.vue:334-337` 读 `pos.x / pos.y`，但后端 `position` 字段实际是 `{bbox, center_x, center_y}`，**没有 x/y 键**。因 `pos` 是真值对象，`if (pos)` 通过，于是拼出 `x:undefined, y:undefined`。**与本轮 UI 改动无关**（该文件未被改动，文件哈希与备份一致）。 | `[一]` `GET /api/violations/list` 实际返回 `position = {"bbox":[...],"center_x":1035.95,"center_y":331.61}`；`[三]` 截图 `reg_violations.png` 该列显示 `x:undefined, y:undefined` | 改 `ViolationList.vue:337` 用 `center_x/center_y`，或后端补 x/y。**需用户确认是否本轮修** |
 
 ### 未确认项（如实登记，**没有编**）
 

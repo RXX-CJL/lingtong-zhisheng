@@ -1,7 +1,27 @@
-# 智瞳灵声 · 会话交接（内容更新至 2026-10-11；第七轮 = 2026-10-10）
+# 智瞳灵声 · 会话交接（内容更新至 2026-10-17；项目本体最近一轮 = 2026-10-11）
 
 > **共同启动规则：** 所有 AI 先读取 `E:\output\_AI_COMMON_RULES.md`。本文是 **2026-10-10 ~ 10-11 的旧任务进度快照**，不是全局永久规则；只有确认继续同一开发任务时，才采用下面的"具体步骤"（§一 ~ §二·补）。
 > **⚠ 范围说明**：§三（用户行为纪律）、§四（CARLA 硬知识）、§五（服务与命令速查）、§七（已推翻的旧结论）是**常驻内容**，任何任务都适用 —— 不要因为"这是旧快照"而跳过它们。
+>
+> **✅ 本轮（2026-10-23，管理端 UI 优化，F1-F10 已全部实施并通过三级验收）**：
+> 用户拍板三决策（1→A 换审核状态分布环形 / 2→授权改代码 / 3→A 统一亮色）后执行。
+> **改 6 个文件**（全部以 .bak_20261023 备份）：
+> ① utils/format.js —— TYPE_MAP 6→12 key（11 类 + 1 个历史别名）+ TYPE_COLORS 同步 + **未映射兜底**（返回「未知类型」并 console.warn，禁止英文外露）
+> ② views/Dashboard.vue —— 类型分布**环形→横向排序条形图**（§2.5 参数：yAxis.inverse:true 最大值置顶、条尾标百分比、删 legend）+ 排行卡→**审核状态分布环形图**（取 by_status）+ 容器 250→260px + 三处 echarts.init 传亮色主题 + **修 KPI 栅格**（原 lg:2 仅 103px 装不下 4 字标签，内容溢出卡片）
+> ③ views/EventDetail.vue —— 删本地补丁 EXTRA_TYPE_CN，统一走 getTypeName()
+> ④ utils/echarts-theme.js —— 深色→**亮色 zt-light** 全量重写（对齐 design-tokens.css）
+> ⑤ components/TypeTag.vue —— 文字色按底色亮度自适应（原硬编码白字，在 #F2C14E 上对比度约 1.9:1 读不清）
+> ⑥ styles/design-tokens.css —— 新增 **el-card 全局令牌化**（全站卡片圆角/描边/阴影统一）
+> **验收（三级证据）**：构建 exit 0；浏览器实测 englishLeak=[]（**零英文外露**）、KPI 1 行 6 卡 0 溢出、3 图 3 图例、7 类中文全可读、最大值在顶；截图 dash_final.png / dash_fullpage_after.png。
+> **顺手发现 2 个既有问题，已登记未擅自修**：**G17** 违规列表「设备位置」列显示 x:undefined, y:undefined（ViolationList.vue:337 读 pos.x，后端实际给 center_x/center_y，与本轮改动无关）；**G16** Statistics.vue 三处 echarts.init 仍未传主题。
+> **回滚**：把任意 .bak_20261023 覆盖回同名文件即可。
+> ---
+> **（评估阶段记录，已被本轮取代）** 用户指出仪表盘两处问题（设备违规排行无用 / 违规类型分布图重叠+文字不统一）。
+> **三级证据诊断**（真实截图 `E:\output\dash.png` + 代码定位）：实测到 **4 个问题**（标签重叠、图例折行、`running_yellow` 英文外露、排行卡完全空白）。
+> **根因**：① 排行卡后端**从无** `by_device` 字段（非故障）；② 7 分类塞 400×250 环形是**几何必然重叠**；③ 中文名有 **5 套映射表**各自为政（前端 6 类 vs 后端 10-11 类）。
+> **三模型并行独立评审**（Codex/gpt-5.6-luna、Qoder/Qwen3.8-Max、CodeBuddy/glm-5.1，全部 exit 0）**结论高度一致：换成横向排序条形图**。
+> 入口：**`E:\output\_ui_optimization_verdict.md`**（含待拍板 3 件事 + 实施清单 F1-F10 + 验收 5 项）。
+> **遗留**：等用户拍板决策 1/2/3 后才能动代码；本会话**未修改任何项目文件**。
 >
 > **🆕 最近一轮（2026-10-16，属"办公室/工具链"而非项目任务）**：**AI 派活通道建设** ——
 > **Codex / CodeBuddy / ★Qoder CN 三条 CLI 通道已打通**（第四条 TRAE CLI 因官方限制"仅企业版旗舰版可用"**已结案**）；
@@ -14,6 +34,75 @@
 > **dshmarket 一键重启在 Desktop 上不可开**（源码级定案：`allowRestart:false` 硬编码）→ 替代脚本 `E:\output\_tools\restart-desktop.bat`（双击即用）。
 > 入口：**`_DSH_OFFICE_STATE.md` §27.16 / §27.17**。
 > **遗留（新会话可直接接手）**：① 技能池是否继续扩展（候选：`windows-safe-fileops` / `dsh-env-forensics` / `zht-demo-runbook`）② 重启脚本首次实测（建议用户空闲时双击一次）。
+
+> **🆕 最近一轮（2026-10-17，「CARLA 仿真工具化」第 1、2 批已交付）**：用户要求把"脚本生成仿真 → 录视频"升级为**可交互拖拽的演示素材生产线**
+> （**定位：演示素材生产线，不属项目本体**，用户当轮明确）。
+> **调研结论**：CARLA 官方**无**"拖拽摆车 + 逐车速度 + 红绿灯时长"三合一 GUI（唯一官方 GUI `carla-studio` 的拖拽只做传感器标定；release 包**不含 UE 编辑器**）；
+> 用户点名的 `oasis-sim` = **Synkrotron/GuardStrike 的 OASIS（商业产品）**，CARLA 官方博客原文称其"提供 Scenario Editor GUI"，需申请试用、不开源。
+> **第 1 批已交付**：`E:\output\1\carla\CARLA_0.9.16\PythonAPI\examples\carla_creator_workshop.py` **546 → 1265 行**，
+> 新增「红绿灯配时」（`freeze_all_traffic_lights` + `on_tick` 相位机）、「车辆速度」（单车/全局速度差/闯红灯概率）、1080p H.264 录制、相机分辨率与帧率切换；
+> 备份 `carla_creator_workshop.py.bak_20261017`（回滚：把备份覆盖回去）。
+> **验收**：`py_compile` exit 0、独立 GUI 冒烟通过（CARLA 未启动也能开窗）；**功能是否真实生效仍需开 CARLA 实测**（见 verdict §10.5 未验证项清单）。
+> **✅ 第 2 批已交付（2026-10-17，点击摆车 / 拖动车辆）**：同一文件 **1265 → 1782 行**，新增「鼠标摆放」子框（点击空地摆车 / 按在车上拖动 / 可选吸附车道 / 删除选中 / 撤销上一步；**点中车会自动同步到「车辆速度」下拉**）；
+> 反投影复用 playbook §6 基向量，屏幕→地面走"解析求交 + `ground_projection` 校正"——**别再去 CARLA API 里找现成函数**（新被推翻结论 **O6**）；
+> 备份 `carla_creator_workshop.py.bak_20261017b`；验收：py_compile exit 0 + 投影单测 **12/12** + GUI 冒烟 **26/26** + 状态机 **13/13** + **真实 CARLA 三级验证 20/20**（Town10HD_Opt，含 4 个只有实机才暴露的 bug 修复，见 verdict §12.8）。
+> **⚠ 启动器已修（2026-10-17）**：`启动CARLA创造工坊.bat` 原来同时有 **LF-only 换行** + **UTF-8 中文内容**，cmd 按 GBK 解析直接崩（双击没窗口）→ 已改成**纯 ASCII + CRLF**，备份 `.bak_20261017`；另给 Tk 加了窗口居中（原来会贴边被裁）。**以后写 .bat 必须 CRLF + 纯 ASCII**，详见 verdict §12.9。
+> **✅ 第 3 批已交付（2026-10-17）**：① 项目名统一为 **智瞳灵声**（工坊标题）；② 修复"点车反而生成新车"——`点击空地摆车` **默认改关**、拾取加 45px 兜底、选中车画**黄框**；③ 新增**右键菜单**：点车可改朝向（正对镜头/±90°/对齐车道/输入角度）、目标速度、闯红灯 100%、删除；点空地可摆车。验收：GUI 冒烟 **35/35**、状态机 **15/15**、真实 CARLA **7/7 + 20/20**。详见 verdict §13。
+> **另（2026-10-17）**：启动器改为 **pyw 无控制台**（不再有黑窗挡住工坊窗口），Python 崩溃会写 `1\carla\仿真输出\workshop_error.log`。
+> **✅ 第 4 批已交付（2026-10-17，行为模式 + 道具）**：右键菜单→「行为模式」可设 **遵守/闯红灯/超速/逆行/压线/违停**（真实 CARLA **10/10** 验证）；蓝图下拉含 **99 种 static.prop** 道具；左栏有「全部车辆开始行驶」。
+> ★ 两个硬坑见 verdict §14.5：**`ignore_lights_percentage(100)` 在本机无效**（同步模式也试了）；**`enable_constant_velocity` 在反向车道方向会反**（手动驱动一律用 `apply_control` 油门）。
+> **🆕 最近一轮（2026-10-23，第 4 批剩余两项）**：① **已交付并验收**；② **代码写完但未验收**（用户睡觉，子代理中断）。
+> 入口：**`E:\output\_carla_workshop_batch4_verdict.md`**（本轮验收结论，含 3 个被推翻的旧结论 + 3 个修掉的真实 bug）。
+>
+> **✅ ① 场景 v2 + 自动保存 + 最近项目 —— 已交付，lead 独立复跑五层全绿**：
+> py_compile 0 ／ 离线 GUI **68/0** ／ 序列化 mock **103/0** ／ 既有 GUI 回归 **35/0** ／ **真实 CARLA round-trip 85/0**。
+> v2 补齐 v1 全部缺口：vehicles(autopilot/behavior_mode/目标速度/闯红灯) + props + 红绿灯配时(含秒数) + 相机机位/fov + 全 14 字段天气 + session；
+> **向后兼容 v1**（`SCENE_FORMAT_READABLE` 同时接受）；自动存档每 180s 原子写 `仿真输出\场景快照\last_session.json`；最近项目 10 条存 `_workshop_recents.json`。
+> **✅ ② 装饰物（EnvironmentObject）选中与隐藏 —— 已交付并验收（2026-10-24）**：
+> **实机 PASS=47 FAIL=0**（`_verify_workshop_env_live.py`）／离线 **73/0**（`_verify_workshop_env_offline.py`）。
+> 三档全实现：A 按类别批量（`hide_env_label`/`show_env_label`）／B 右键点中单个（`_env_pick`/`hide_env_single`）／C 相机半径批量（`hide_env_in_range`）+ 一键恢复（`restore_all_env`）。
+> **★ 本轮最有价值的发现**：一根路灯/一棵树常由**多个同心 EnvironmentObject** 组成（Poles 880 个聚成 508 组，**254 组是多对象**，每根灯常有 2~3 件，如 `BP_StreetLight_doble10_SM_1`/`_SM_2` 共用同一 bbox.location）。
+> 单独藏会留下**残缺的半个路灯** → 新增 `_env_sibling_ids(label, ids, tol=0.05)` 按中心坐标吸附同组，藏一根 = 藏整组，恢复也成对。
+> **缓存实测**：首次 1,444~1,552 ms → 命中 **0.0068 ms**（约 20 万倍）；三档实测：档A 藏 62,581 个植被（画面 19.6% 像素变化）、档B 精确命中 `SM_Parklight2_SM_0`、档C 半径 50m 命中 569 个。
+>
+> **✅ AI 化（--headless + JSON 剧本）—— 已交付并验收（2026-10-24）**：**PASS=21 FAIL=0**。
+> **AI 一条命令出片**：`py -3.12 <工坊.py> --recipe E:\output\recipes\闯红灯演示.json` → 7.8 秒产出 4.05s H.264 视频（960x540/20fps/81帧），**全程零交互、无弹窗、世界自动还原**。
+> 另有 `--selftest`（不开 CARLA 校验剧本，坏剧本给中文错误）与 `--print-schema`（自描述格式）。
+> 实现方式（最小侵入）：headless 下仍建隐藏 `tk.Tk()` 让 32 个 Tk 变量保持真实，把 **17 种控件构造器**换 `_StubWidget`、**60 处模态调用**换无交互适配器 → **116 处 `.pack()` 一行不用改，GUI 路径零风险**。
+> **★ 两个真实产品缺陷被修掉**：① **录制视频播放慢一倍**（CARLA 异步下相机实测 **43.4 fps**，ffmpeg 却用 `-r 20` 封装 → 5 秒录成 10.25 秒）→ 改用时间戳门控重采样，5 秒剧本现在产出 **101 帧/5.05 秒**；
+> ② 录制起点错误（`hide`/相机等预置阶段被录进视频）→ 准备动作做完才开始录制。
+> 入口：**`_carla_workshop_batch4_env_verdict.md`**（② 验收）+ **`_carla_workshop_ai_verdict.md`**（AI 化）+ `_carla_workshop_ai_design.md`（设计稿）+ `E:\output\recipes\闯红灯演示.json`（示例剧本）。
+>
+> **✅ 收尾轮（2026-10-24）—— 已交付**：**`_carla_workshop_wrapup_verdict.md`**。
+> 修掉 1 个设计脆弱点：**`enable_headless()` 是进程级不可逆的 tkinter 改写**（同进程内先跑剧本再开 GUI → 窗口全是空壳控件且不报错）。
+> 已加两道加固：前置检查（有存活实例直接抛错拒绝）+ 新增 `disable_headless()` 精确还原 23 个被替换对象；实测可逆切换 `preview=Label/record_button=Button/map_combo=Combobox`。
+> **跨进程（用户双击 bat）完全干净**，GUI 交互行为零改动。
+> 另验证了 3 个「写了但没真跑」的东西：真 GUI 开窗 OK、`_world_state.py diff` 能真抓到污染、AI 产物 → GUI 接续 OK。
+> 修了验收脚本自身缺陷：**「断言世界干净」的脚本必须先清理自己的残留**（曾把自己的调试车误判成产品缺陷，21-0 掉到 19-2）。
+> 清理 **44 个**临时脚本 + 3 个临时目录；**新增回滚点 `.bak_20261024_after_ai`**。
+>
+> **🎯 下一步（新会话直接用）**：
+> 1. **车牌**（`apply_color_texture_to_object`，只走 CARLA 内贴图；后处理逐帧叠加已被用户否决）—— **需用户先确认贴图方案与素材来源**
+> 2. 剧本 `camera.preset`（预设机位名）尚未实现，只支持显式 transform
+> 3. 红绿灯配时的**崩溃场景**残留风险（进程崩溃时 stop 跑不到，无法写回）
+> 4. `_scripts` 里另有 300+ 历史脚本（非本轮产生），是否清理待用户决定
+>
+> **📦 回滚点共 4 个**：`.bak_20261017b`(57K, 第2批) → `.bak_20261023`(96K, 第1~3批) → `.bak_20261023_after_v2`(123K, ①完成) → **`.bak_20261024_after_ai`(191K, 当前态)**。
+>
+> **⚠ 三个必须记住的新硬知识（详见 batch4 verdict §3）**：
+> - `reflection_intensity` 在 0.9.16 **不存在**；`WeatherParameters` 只有 **14 个**数值字段 + 23 个预设常量（常量不能存）
+> - **「6.2 万必须空间过滤」的理由要改**：真正慢的是 `get_environment_objects()` RPC（**133~228 ms**），numpy 全量投影只要 **1.2 ms**
+> - `EnvironmentObject.id` **超出 int64**（样例 16740775638937321093）→ **绝不能进 numpy int64 数组**（OverflowError）；且它**没有** `get_world_vertices()`，`bbox.location != transform.location`
+>
+> **🐛 本轮修掉的 3 个真实 bug（都是 lead 审查抓的，不是子代理自查）**：
+> ① 恢复场景速度用了 `enable_constant_velocity`（违反 K2，反向车道会走反）→ 改 `_drive_forward` + `parked` 守卫；
+> ② 两处 `askyesno` 默认按钮是「是」→ 误按回车直接 reload 丢现场 → 已加 `default="no"`；
+> ③ **红绿灯配时永久改写且不还原**（第 1 批遗留）：`set_*_time()` 永久改写、`reset_group()` 只重置相位不恢复秒数 → 已加 `_tl_snapshot_durations`/`_tl_restore_durations` 快照还原；**遗留**：只覆盖正常 stop 路径，崩溃仍会残留。
+> &nbsp;&nbsp;&nbsp;教训：**「世界干净」不能只看 actor 数量**，配时/天气/世界设置/隐藏物体/机位都要逐项断言还原。
+>
+> **回滚**：`.bak_20261023_after_v2`（125,791 字节，① 完成后 ② 开工前）→ 只回滚 ②；`.bak_20261023`（98,380 字节，① 开工前）→ 连 ① 一起回滚。
+> **收工现场已还原**：23 actor ／ 车辆·道具·相机 0 ／ 红绿灯 15 盏全 10/3/2 ／ 64,571 个装饰物全可见 ／ 用户机位未变。
+> 早期入口：**`E:\output\_carla_sim_tooling_verdict.md`**（第 1~4 批实录 + 被推翻结论 O1~O9 + 硬坑 K1/K2 见 §14.5）+ `_scout_notes\`（调研原始笔记）。
 
 > **用途**：新会话开场读这份 + `_PROJECT_MAP.md`，即可接上进度。
 > **本文件只记"现在在哪、下一步做什么"**，不记过程与流水账（协议 §9.2）。
