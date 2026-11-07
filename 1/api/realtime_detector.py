@@ -415,7 +415,21 @@ class RealtimeViolationDetector:
             engine = TrafficEventEngine(
                 rule_plugins=plugins,
                 frame_buffer=frame_buffer,
-                cooldown_sec=60,
+                # ★2026-11-07 由 DSH 改：60 -> 300，并把「同车同类型只报一次」交给引擎的去重。
+                #
+                # 为什么改（实测事故）：
+                #   原来 cooldown_sec=60，一辆**停在原地压线**的车每分钟被重报一次。
+                #   实测库中 lane_departure 共 570 条，其中 track_id=5 一辆车占 278 条
+                #   （时间间隔精确 60.1/60.2/60.5/60.3 秒，坐标固定 (727.5, 357.0)）。
+                #   后果：演示时事件列表被同一辆车刷屏，看起来像假数据。
+                #
+                # 为什么不是无限期只报一次：
+                #   track_id 会复用（CARLA 里车消失后新车可能撞上旧 id），
+                #   永久去重会让新车被误判为「已报过」而漏报。
+                #   300 秒（5 分钟）足够覆盖一次路口通行，又不会跨车辆生命周期。
+                #
+                # 可用 VIOLATION_EVENT_COOLDOWN_SEC 覆盖。
+                cooldown_sec=float(os.environ.get("VIOLATION_EVENT_COOLDOWN_SEC", "300")),
                 # ★2026-10-06 由 DSH 注入统一时钟：
                 # 回放本地视频时用"视频时间"，摄像头/CARLA 时 _now() 内部自动回退墙钟。
                 # 这样事件 trigger_time、冷却、证据帧窗口三者同源，
@@ -611,8 +625,26 @@ class RealtimeViolationDetector:
 
         try:
             from scene_annotation import load_scene, video_key
-            src = getattr(self, '_source_path', None) or getattr(self, '_source_url', None)
+            # ★★2026-11-07 由 WorkBuddy 修正（真 bug，标定会「挂载成功又消失」）：
+            #   原来这里取 src = self._source_path or self._source_url。
+            #   **CARLA 源这两个都是 None**（CARLA 不是文件/流源）->
+            #   load_scene(None) 返回空 dict -> 刚挂载好的 CARLA 标定被**清空**。
+            #   实测症状：/status 里 scene_annotation_reload_count=0（看似正常），
+            #   但 /vehicles 的 speed_calibration.method 变成 assumed_lanes（无标定），
+            #   测速精度直接掉到「±50% 仅供参考」。
+            #   修法：源标识统一走 _scene_source_id（文件源/流源/CARLA 都有），
+            #   优先用它，只有它为空时才回退到 _source_path/_source_url。
+            src = (getattr(self, '_scene_source_id', None)
+                   or getattr(self, '_source_path', None)
+                   or getattr(self, '_source_url', None))
             new = load_scene(src) or {}
+            if not new:
+                # 查不到对应标注 -> **保留旧标注**，不要用空 dict 覆盖
+                # （否则一次失败的查找就把正在生效的标定废掉了）
+                logger.warning("[RealtimeDetector] 场景标注热重载未找到对应文件"
+                               f"（src={src!r}），保留当前标注不变")
+                self._scene_sig = sig
+                return False
         except Exception as e:
             logger.warning(f"[RealtimeDetector] 场景标注热重载失败（沿用旧标注）: {e}")
             self._scene_sig = sig              # 记下签名，避免每 0.5s 重试吵闹
