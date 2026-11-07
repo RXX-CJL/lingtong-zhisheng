@@ -941,6 +941,91 @@ class CloudCollaborator:
                      "请给出 uncertain，并说明缺什么信息。")
         return "\n".join(lines)
 
+    # ★2026-11-07 由 DSH 新增：送审图里附加「信号灯放大特写」。
+    #
+    # 为什么加（实测，用户提出）：
+    #   演示视频 dual_cam_demo_h264.mp4 是双摄合成，右下角有 CAM-2 SIGNAL HEAD 小窗。
+    #   但**整帧送审时灯太小**：实测整帧 YOLO 检出的灯 bbox 只有 15x38 像素，
+    #   豆包/DeepSeek 反复回答「未能明确看到信号灯状态」→ 9 条事件全 uncertain。
+    #
+    #   实测对比（同一帧 vidframe_150）：
+    #     整帧 1920x1080        -> 灯 bbox 15x38，AI 看不清
+    #     CAM-2 小窗 490x290     -> 灯 bbox 28x78，置信度 0.817（比整帧 0.786 高）
+    #     灯本身放大 6x 468x768  -> 肉眼可清楚分辨「上黄下暗」，这就是 AI 需要的输入
+    #
+    # 关键设计：**只改送审图，不动显示画面**。
+    #   用户担心的「放大了会遮挡主窗口」不会发生——显示的帧完全不改，
+    #   这里只影响送云端的那一张 contact sheet。
+    #
+    # 可用环境变量关闭：EVENT_LIGHT_ZOOM=0
+    _LIGHT_ZOOM_ENABLED = os.environ.get('EVENT_LIGHT_ZOOM', '1') not in ('0', 'false', 'False')
+    _LIGHT_ZOOM_SCALE = int(os.environ.get('EVENT_LIGHT_ZOOM_SCALE', '6'))
+    _LIGHT_MAX_COUNT = int(os.environ.get('EVENT_LIGHT_ZOOM_MAX', '3'))
+
+    def _find_traffic_lights(self, img):
+        """用 YOLO 找交通灯框，返回 [(x1,y1,x2,y2,conf)]，失败返回 []。"""
+        try:
+            import cv2 as _cv2
+            from image_recognizer import init_yolo_model, yolo_models
+        except Exception:
+            return []
+        try:
+            if 'traffic_light' not in yolo_models:
+                if not init_yolo_model('traffic_light'):
+                    return []
+            model = yolo_models.get('traffic_light')
+            if model is None:
+                return []
+            results = model(img, conf=0.15, imgsz=960, verbose=False)
+            out = []
+            for r in results:
+                for b in r.boxes:
+                    if int(b.cls[0]) != 9:      # COCO 第 9 类 = traffic light
+                        continue
+                    xy = [int(v) for v in b.xyxy[0]]
+                    out.append((xy[0], xy[1], xy[2], xy[3], float(b.conf[0])))
+            out.sort(key=lambda t: -t[4])       # 置信度高的优先
+            return out[:self._LIGHT_MAX_COUNT]
+        except Exception as exc:
+            logger.debug(f"[CloudCollaborator] 交通灯检测失败: {exc}")
+            return []
+
+    def _compose_light_zoom_panel(self, frame, panel_w: int = 640, panel_h: int = 360):
+        """从一帧里裁出交通灯并放大，拼成一块面板；无灯时返回 None。"""
+        try:
+            import numpy as _np
+            import cv2 as _cv2
+        except Exception:
+            return None
+        lights = self._find_traffic_lights(frame)
+        if not lights:
+            return None
+        panel = _np.full((panel_h, panel_w, 3), 24, dtype=_np.uint8)
+        h_img, w_img = frame.shape[:2]
+        cell_w = panel_w // max(len(lights), 1)
+        for i, (x1, y1, x2, y2, conf) in enumerate(lights):
+            pad = max(10, int((x2 - x1) * 0.6))
+            cx1 = max(0, x1 - pad); cy1 = max(0, y1 - pad)
+            cx2 = min(w_img, x2 + pad); cy2 = min(h_img, y2 + pad)
+            if cx2 <= cx1 or cy2 <= cy1:
+                continue
+            crop = frame[cy1:cy2, cx1:cx2]
+            if crop.size == 0:
+                continue
+            scale = min((cell_w - 8) / max(crop.shape[1], 1),
+                        (panel_h - 40) / max(crop.shape[0], 1))
+            scale = max(scale, 1.0)
+            big = _cv2.resize(crop, None, fx=scale, fy=scale,
+                              interpolation=_cv2.INTER_CUBIC)
+            bh = min(big.shape[0], panel_h - 40)
+            bw = min(big.shape[1], cell_w - 8)
+            ox = i * cell_w + (cell_w - bw) // 2
+            oy = 34 + (panel_h - 40 - bh) // 2
+            panel[oy:oy + bh, ox:ox + bw] = big[:bh, :bw]
+            _cv2.putText(panel, f"LIGHT {i+1} {conf:.2f}", (i * cell_w + 6, 24),
+                         _cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2, _cv2.LINE_AA)
+        return panel
+
     def _compose_event_contact_sheet(self, frames: List, max_count: int = 5,
                                       tile_width: int = 640, tile_height: int = 360):
         """把按时间顺序抽取的多帧拼成一张带序号的证据图；失败时返回 None。
@@ -1003,6 +1088,31 @@ class CloudCollaborator:
             row, col = divmod(idx, cols)
             y, x = row * tile_height, col * tile_width
             sheet[y:y + tile_height, x:x + tile_width] = tile
+
+        # ★2026-11-07 由 DSH 新增：底部追加一行「信号灯放大特写」。
+        # 只在真有灯时追加；没有灯就原样返回，不改变原有行为。
+        # 目的：让云端 AI 能看清灯色（整帧里灯只有 15x38 像素，AI 看不清）。
+        # 只影响送审图，显示的帧不受影响（不会遮挡主画面）。
+        if self._LIGHT_ZOOM_ENABLED:
+            try:
+                panels = []
+                for frame in list(frames or [])[:max_count]:
+                    arr = frame if isinstance(frame, _np.ndarray) else None
+                    if arr is None:
+                        continue
+                    p = self._compose_light_zoom_panel(arr, tile_width, tile_height)
+                    if p is not None:
+                        panels.append(p)
+                if panels:
+                    strip = _np.full((tile_height, cols * tile_width, 3), 24, dtype=_np.uint8)
+                    for idx, p in enumerate(panels[:cols]):
+                        strip[:, idx * tile_width:(idx + 1) * tile_width] = p
+                    sheet = _np.vstack([sheet, strip])
+                    logger.info(f"[CloudCollaborator] 送审图已附加信号灯放大特写 "
+                                f"({len(panels)} 帧有灯，放大倍数={self._LIGHT_ZOOM_SCALE}x 等效)")
+            except Exception as exc:
+                logger.debug(f"[CloudCollaborator] 信号灯放大面板附加失败: {exc}")
+
         return sheet
 
     def _analyze_event_with_doubao(self, frames: List, event_type: str,

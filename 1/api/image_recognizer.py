@@ -219,7 +219,7 @@ def find_model_path(model_key):
         'yolov8s': 'yolov8s.pt',
         'vehicle': 'yolov8s.pt',
         'helmet': 'helmet_best.pt',
-        'traffic_light': 'yolov8s.pt',
+        'traffic_light': 'traffic_light_best.pt',
         'lane': 'lane.pt',
         'license_plate': 'license_plate.pt'
     }
