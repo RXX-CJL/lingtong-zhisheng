@@ -9,6 +9,27 @@ import os
 # 表现为"总违规数 0"却不报错。此处改为绝对路径，与启动目录无关。
 # （2026-09-27 由 DSH 修复，原行：DATABASE_URL = "sqlite:///./zhitong_violations.db"）
 _DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "zhitong_violations.db")
+
+# ★2026-11-07 由 DSH 新增：允许用环境变量把数据库指向别处。
+#
+# 为什么必须加这个口子（实测事故）：
+#   原来 DATABASE_URL 是硬编码的，测试跑一遍就写一遍**生产库**。
+#   实测证据：2026-11-07 跑 9 个 unittest 模块后，生产库
+#   zhitong_violations.db 里多出 18 条 fixture 假事件
+#   （id=3552~3569，全是 red_light、bbox=[100,100,200,...]、
+#    track_id 只有 1/2/7、key_frames=[]、state=triggered），
+#   并且把 test_event_media_contract 的失败数从基线 431 推到 683。
+#   后果：演示时事件列表混入假数据，且"失败数增长"会让人误判成代码回归。
+#
+# 用法（跑测试时）：
+#   ZHITONG_DB_PATH=E:/output/_tmp/test_zhitong.db \
+#     python -m unittest tests.test_traffic_event_engine
+# 不设该变量时行为完全不变（仍用生产库），所以对现有启动脚本零影响。
+_DB_OVERRIDE = os.environ.get("ZHITONG_DB_PATH", "").strip()
+if _DB_OVERRIDE:
+    _DB_FILE = os.path.abspath(_DB_OVERRIDE)
+    print(f"[database] 已按 ZHITONG_DB_PATH 覆盖数据库路径: {_DB_FILE}")
+
 DATABASE_URL = "sqlite:///" + _DB_FILE.replace("\\", "/")
 
 # 只读提示：同名的 0 字节空壳文件存在时给出明确警告（不自动删除任何文件）
