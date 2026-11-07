@@ -27,11 +27,31 @@ echo   Restart Backend (port 8001)
 echo =========================================
 echo.
 
+rem ---- Python interpreter (2026-11-07: Python312 is FIRST, by design) ----------
+rem  Why the order changed: the carla module ships ONLY as
+rem  carla-0.9.16-cp312-cp312-win_amd64.whl - it is physically uninstallable on
+rem  Python 3.11. While this launcher picked zhitong-gpu (3.11), every CARLA
+rem  route would 500 with "No module named carla", and CARLA could only run in
+rem  a side instance on another port.
+rem  Measured on 2026-11-07 (same frame, same models, both interpreters):
+rem    ultralytics 8.4.35 (py312)  vs 8.4.103 (py311)  -> identical detections
+rem    opencv      4.10.0 (py312)  vs 5.0.0   (py311)  -> py312 is BETTER:
+rem        cv2.HoughLinesP changed shape (N,1,4)->(N,4) in 5.x, so on 3.11
+rem        LaneDetector threw "cannot unpack non-iterable numpy.int32" and
+rem        returned 0 lane lines; on 3.12 the same frame yields 18.
+rem  Override with ZHITONG_PY=<full path to python.exe> if this hardcoded
+rem  location ever moves (do not rely on PATH: several pythons exist here).
 set "PYEXE="
-if exist "C:\miniconda\envs\zhitong-gpu\python.exe" set "PYEXE=C:\miniconda\envs\zhitong-gpu\python.exe"
+if defined ZHITONG_PY set "PYEXE=%ZHITONG_PY%"
+if not defined PYEXE if exist "C:\Users\ROG\AppData\Local\Programs\Python\Python312\python.exe" set "PYEXE=C:\Users\ROG\AppData\Local\Programs\Python\Python312\python.exe"
+if not defined PYEXE if exist "C:\miniconda\envs\zhitong-gpu\python.exe" set "PYEXE=C:\miniconda\envs\zhitong-gpu\python.exe"
 if not defined PYEXE for /f "delims=" %%i in ('where python 2^>nul') do if not defined PYEXE set "PYEXE=%%i"
 if not defined PYEXE set "PYEXE=py -3"
 echo   Python: %PYEXE%
+rem  Self-check: show the interpreter version and whether carla is importable,
+rem  so "which python is the backend actually using" is never a guess again.
+"%PYEXE%" -c "import sys;print('  version: '+sys.version.split()[0])" 2>nul
+"%PYEXE%" -c "import carla;print('  carla  : OK '+carla.__file__)" 2>nul || echo   carla  : MISSING (CARLA routes will fail) - expected on Python 3.11
 echo.
 
 set "PID="
@@ -85,9 +105,24 @@ set "TUNE_FRAME_RATE=6"
 set "TUNE_MODEL_SEQUENCE=vehicle,traffic_light,helmet,lane"
 set "TUNE_BOX_PREDICTION=1"
 
+rem ---- PaddleOCR (2026-11-07, measured - keep in sync with start-all.bat) ----
+rem  Two env vars are REQUIRED for license-plate OCR on this machine:
+rem   PADDLE_PDX_CACHE_HOME
+rem     paddlex caches models under %USERPROFILE%\.paddlex by default. Here four of
+rem     the five model dirs under that path deny even Get-Acl to this account, so
+rem     OCR raised PermissionError on inference.yml and every plate came back blank.
+rem     Pointing the cache at F: makes paddlex use a directory we fully control.
+rem   PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT=False
+rem     paddlex auto-picks the mkldnn backend on CPU, and paddlepaddle 3.3.1 then
+rem     fails with NotImplementedError ConvertPirAttribute2RuntimeAttribute.
+rem     With it disabled, the same image recognizes "JING A 12345" at 0.9992.
+set "PADDLE_PDX_CACHE_HOME=F:\AI\paddlex_cache"
+set "PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT=False"
+set "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True"
+
 echo   launching backend (cwd = project root, PYTHONPATH includes api and root) ...
 echo   tuning: imgsz=%TUNE_IMGSZ% frame_rate=%TUNE_FRAME_RATE% prediction=%TUNE_BOX_PREDICTION%
-start "ZhiTong Backend API" cmd /k cd /d %~dp0 ^&^& set "PYTHONPATH=%~dp0api;%~dp0" ^&^& set "YOLO_IMGSZ=%TUNE_IMGSZ%" ^&^& set "FRAME_RATE=%TUNE_FRAME_RATE%" ^&^& set "YOLO_MODEL_SEQUENCE=%TUNE_MODEL_SEQUENCE%" ^&^& set "BOX_PREDICTION=%TUNE_BOX_PREDICTION%" ^&^& "%PYEXE%" -m uvicorn app:app --host 127.0.0.1 --port 8001
+start "ZhiTong Backend API" cmd /k cd /d %~dp0 ^&^& set "PYTHONPATH=%~dp0api;%~dp0" ^&^& set "YOLO_IMGSZ=%TUNE_IMGSZ%" ^&^& set "FRAME_RATE=%TUNE_FRAME_RATE%" ^&^& set "YOLO_MODEL_SEQUENCE=%TUNE_MODEL_SEQUENCE%" ^&^& set "BOX_PREDICTION=%TUNE_BOX_PREDICTION%" ^&^& set "PADDLE_PDX_CACHE_HOME=%PADDLE_PDX_CACHE_HOME%" ^&^& set "PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT=%PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT%" ^&^& set "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=%PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK%" ^&^& "%PYEXE%" -m uvicorn app:app --host 127.0.0.1 --port 8001
 echo   waiting 10s, then self-check ...
 timeout /t 10 /nobreak >nul
 

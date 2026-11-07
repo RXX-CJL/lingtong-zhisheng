@@ -339,6 +339,13 @@ class RealtimeViolationDetector:
         self._scene_reload_at = 0.0         # 节流用：上次检查的墙钟
         self._scene_reload_count = 0        # 累计热重载次数（供 /status 观测）
         self._scene_reload_last = None      # 最近一次热重载的时间字符串
+        # ★2026-11-07 由 WorkBuddy 新增：CARLA 源的**稳定场景源标识**
+        # （固定字符串，不用 actor id / tick —— 那些每次重启都会飘）。
+        # 标定文件路径 = scene_annotation._path_for(self._scene_source_id)。
+        self._scene_source_id = None
+        # ★2026-11-07 由 WorkBuddy 新增：按车流方向的灯态（CARLA 仿真真值）
+        #   {'away': 'red', 'toward': 'green'} —— 用于消除对向车流的误报。
+        self._light_state_by_motion = {}
         # ★★2026-10-09 由 DSH 新增：**检测类白名单**过滤的观测计数。
         # 根因（设计单 §12.6 问题 2）：渲染器主循环只跳过红绿灯、其余照画，
         #   而 CLASS_CN_MAP 有 107 类、其中 83 类与交通无关 -> 用户看到"盆栽"被画成框。
@@ -426,6 +433,56 @@ class RealtimeViolationDetector:
             self.event_loop.run_forever()
         except Exception as e:
             logger.error(f"Event loop error: {e}")
+
+    def _ensure_event_loop(self):
+        """保证后台事件循环在跑（2026-10-23 由 DSH 新增）
+
+        为什么需要它（用户报的"违规告警比画面标注慢"的真根因）：
+          · `event_loop` 只在 `__init__` 里创建并启动**一次**；
+          · `stop()` 会 `call_soon_threadsafe(event_loop.stop)` ——
+            一旦 `run_forever()` 返回，该 loop 就处于 `_stopping` 状态，**不可复用**；
+          · 而 `start_detection()` 原来**从不重启它** ->
+            做过一次「开始→停止→再开始」之后，`event_loop.is_running()` 永远是 False，
+            `_push_violation_event()` 每次都走 else 分支把推送**静默丢弃**。
+          实测铁证（/api/realtime/status）：
+            ws_clients=1（前端连上了）但 push_loop_alive=False、
+            push_scheduled=2 且 push_failed=2（两次推送全失败、0 条送达）。
+          后果：前端 WebSocket 收不到任何推送，只能退回 800ms 定时轮询
+                （平均多等 400ms，最坏 800ms）。
+
+        做法：loop 没在跑就**重建一个新 loop + 新线程**（旧 loop 已 stop 无法 run_forever）。
+        幂等：已在跑时直接返回 True，不产生额外线程。
+        """
+        try:
+            if self.event_loop is not None and self.event_loop.is_running():
+                return True
+            # 旧 loop 可能已 stop（不可复用），必须换新的
+            old = getattr(self, 'event_loop', None)
+            if old is not None and not old.is_closed():
+                try:
+                    old.close()
+                except Exception:
+                    pass
+            self.event_loop = asyncio.new_event_loop()
+            self.loop_thread = threading.Thread(
+                target=self._run_event_loop, daemon=True, name="rt-ws-loop"
+            )
+            self.loop_thread.start()
+            # 等待线程真正进入 run_forever（最多 1s），避免紧接着的推送又落空
+            _deadline = time.time() + 1.0
+            while time.time() < _deadline:
+                if self.event_loop.is_running():
+                    break
+                time.sleep(0.01)
+            _ok = self.event_loop.is_running()
+            if _ok:
+                logger.info("[RealtimeDetector] 后台事件循环已（重新）启动 —— WebSocket 推送恢复")
+            else:
+                logger.warning("[RealtimeDetector] 后台事件循环启动超时 —— 推送仍不可用（将退回轮询）")
+            return _ok
+        except Exception as e:
+            logger.error(f"[RealtimeDetector] 启动后台事件循环失败: {e}")
+            return False
 
     def _init_all_models_safe(self):
         try:
@@ -746,8 +803,26 @@ class RealtimeViolationDetector:
 
             if source_type == "carla":
                 try:
-                    from carla_source import CarlaSource
+                    # ★2026-11-07 由 DSH 修复（BUG-4，实测踩到）：
+                    #   原来这里 new 了一个**独立**的 CarlaSource 实例，而
+                    #   routers/realtime.py:1190 的 _carla_source_instance 是另一个实例。
+                    #   两个实例各自 connect、各自 attach_camera、各自 tick()。
+                    #   后果（实测，8002 端口）：
+                    #     · /carla/connect + /carla/next-scene 作用在 A 实例上；
+                    #     · 检测循环取帧走 B 实例 —— B 的相机挂在「自己 spawn 的第一辆车」
+                    #       上，而 B 从未 spawn_vehicles -> 相机被 spawn 在
+                    #       carla.Transform(x=1.5, z=2.4) 的相对坐标上，
+                    #       即世界原点附近 —— 实测抓到的帧是被建筑挡住的墙。
+                    #     · 双方各自 world.tick() -> 同步模式下互相抢步进。
+                    #   修法：复用路由层那**同一个**实例（single source of truth）。
+                    try:
+                        from routers.realtime import _get_carla_source
+                        self.carla_source = _get_carla_source()
+                    except Exception as _e:
+                        logger.debug(f"[RealtimeDetector] 复用路由层 CARLA 实例失败，回退自建: {_e}")
+                        self.carla_source = None
                     if self.carla_source is None:
+                        from carla_source import CarlaSource
                         self.carla_source = CarlaSource()
                     if not self.carla_source.is_connected():
                         ok = self.carla_source.connect(host="127.0.0.1", port=2000)
@@ -755,9 +830,86 @@ class RealtimeViolationDetector:
                             logger.warning("[RealtimeDetector] CARLA 连接失败，请确认 CarlaUE4.exe 已启动")
                             return False
                     # CARLA 模式下挂载摄像头传感器
-                    self.carla_source.attach_camera(width=640, height=480, fov=90)
+                    # ★2026-11-07：分辨率/机位改为可配（原来是 640x480 fov90，
+                    #   与现有 1920x1080 标定不匹配 -> 反投影/测速全错，项目手册 T88）。
+                    #   默认取 CARLA_DEMO_WIDTH/HEIGHT/FOV 环境变量，缺省 1280x720 fov90：
+                    #   比 640x480 更接近演示口径，又不至于吃满显存。
+                    try:
+                        _w = int(os.environ.get("CARLA_DEMO_WIDTH", "1280"))
+                        _h = int(os.environ.get("CARLA_DEMO_HEIGHT", "720"))
+                        _fov = int(os.environ.get("CARLA_DEMO_FOV", "90"))
+                    except Exception:
+                        _w, _h, _fov = 1280, 720, 90
+                    self.carla_source.attach_camera(width=_w, height=_h, fov=_fov,
+                                                   mount_on_vehicle=False)
                     self.source_type = "carla"
-                    logger.info("[RealtimeDetector] 数据源已切换为 CARLA")
+
+                    # ★★2026-11-07 由 WorkBuddy 新增（任务三：让 CARLA 分支**真正加载标定**）
+                    #
+                    # 改前的事实（用户与上一轮共同核实）：
+                    #   CARLA 分支**没有**给 _scene_cfg_path 赋值，也**没有** load_scene()；
+                    #   而 _maybe_reload_scene_annotation() 每帧都调用它 ->
+                    #   _scene_config_path() 返回 None -> 热重载永远空转 ->
+                    #   **标定文件写出来了也不会被加载**，测速/停止线全部用默认值。
+                    #
+                    # 修法（与文件/流源同源，只多一个稳定的 CARLA 源标识）：
+                    #   源标识固定为 "carla:<地图>:<机位>:<画幅>"，
+                    #   **不能**用 actor id 或 tick（会飘，每次重启都是新键）。
+                    try:
+                        _map_name = "unknown"
+                        try:
+                            _map_name = str(self.carla_source._world.get_map().name).split("/")[-1]
+                        except Exception:
+                            pass
+                        self._scene_source_id = (f"carla:{_map_name}:cam_A_handbook:"
+                                                f"{_w}x{_h}")
+                        from scene_annotation import _path_for, load_scene
+                        self._scene_cfg_path = _path_for(self._scene_source_id)
+                        self._scene_annotation = load_scene(self._scene_source_id) or {}
+                        self._scene_sig = self._scene_sig_of(self._scene_cfg_path)
+                        self._scene_reload_at = time.time()
+                        self._scene_reload_count = 0
+                        self._scene_reload_last = None
+                        logger.info(f"[RealtimeDetector] CARLA 场景标注已挂载: "
+                                    f"source_id={self._scene_source_id} "
+                                    f"path={self._scene_cfg_path} "
+                                    f"停止线={self._scene_annotation.get('stop_line_y')} "
+                                    f"斑马线={len(self._scene_annotation.get('crosswalk_zones') or [])}")
+                    except Exception as _e:
+                        logger.warning(f"[RealtimeDetector] CARLA 场景标注挂载失败: {_e}")
+                        self._scene_source_id = None
+                        self._scene_cfg_path = None
+
+                    # ★2026-11-07 由 DSH 新增（P0 联调实测缺口）：
+                    #   切到 carla 源后，原来**从不生成车流** —— CarlaSource 的
+                    #   spawn_vehicles() 只有测试脚本会调，路由和检测器都不调。
+                    #   结果画面是一个空路口，YOLO 只能检出红绿灯和盆栽，
+                    #   tracked_vehicle_count 恒为 0，永远不可能判出任何违规。
+                    #   现在按 CARLA_TRAFFIC_N 环境变量自动生成（缺省 20 辆，0 = 不生成）。
+                    try:
+                        _n = int(os.environ.get("CARLA_TRAFFIC_N", "20"))
+                    except Exception:
+                        _n = 20
+                    if _n > 0:
+                        try:
+                            _existing = len(self.carla_source._world.get_actors()
+                                            .filter('vehicle.*'))
+                            # 只有场上车太少时才补，避免每次切源都堆一批
+                            if _existing < _n:
+                                _want = _n - _existing
+                                _ids = self.carla_source.spawn_vehicles(_want)
+                                logger.info(f"[RealtimeDetector] CARLA 车流已生成："
+                                            f"请求 {_want} 辆，成功 {len(_ids)} 辆 "
+                                            f"（场上共 {_existing + len(_ids)} 辆）")
+                            else:
+                                logger.info(f"[RealtimeDetector] CARLA 场上已有 "
+                                            f"{_existing} 辆车，跳过车流生成")
+                        except Exception as _e:
+                            logger.warning(f"[RealtimeDetector] CARLA 车流生成失败: {_e}")
+
+                    logger.info(f"[RealtimeDetector] 数据源已切换为 CARLA"
+                                f"（复用路由层实例 id={id(self.carla_source)}，"
+                                f"相机 {_w}x{_h} fov={_fov}）")
                     return True
                 except Exception as e:
                     logger.error(f"[RealtimeDetector] 切换 CARLA 数据源失败: {e}")
@@ -807,6 +959,13 @@ class RealtimeViolationDetector:
                 except Exception:
                     pass
             self.active_events.clear()
+
+        # ★★2026-10-23 由 DSH 修复：**每次启动都确保 WebSocket 推送的事件循环在跑**。
+        #   stop() 会停掉 event_loop 且不可复用，原实现从不重启 ->
+        #   「开始→停止→再开始」之后推送永久失效（实测 push_failed=2 / 送达 0 条），
+        #   前端只能退回 800ms 轮询（平均多等 400ms）。
+        #   放在起的线程之外调用：_ensure_event_loop 内部自己起线程并等就绪。
+        self._ensure_event_loop()
 
         thread = threading.Thread(target=self._detection_loop, daemon=True)
         thread.start()
@@ -1138,12 +1297,43 @@ class RealtimeViolationDetector:
             traffic_light_state = self._scene_light_state_from_cnn(rois=_rois)
             if not traffic_light_state:
                 traffic_light_state = self._detect_traffic_light_state(detections)
+
+            # ★★2026-11-07 由 WorkBuddy 新增（CARLA 源用**仿真真值**灯态）
+            #
+            # 为什么：画面里同时有 8~15 盏灯。图像判色（CNN）只能回答
+            #   「画面里某一盏灯是什么颜色」，无法回答「**本车道**那盏是什么颜色」；
+            #   旧逻辑在未标 ROI 时取「任意一盏灯的最高优先级」(红>绿>黄)，
+            #   实测把横向车道的红灯当成本方向的 -> 每循环误报 5~7 次。
+            # CARLA 仿真端**知道**每盏灯的真实状态，而且我们能确定
+            #   「哪盏灯控制本机位看到的那条停止线」（按停止线地理坐标反查）。
+            # 因此 CARLA 源下用仿真真值作为场景灯态 —— 准确、可复现、不依赖判色命中。
+            # 图像判色结果仍保留在 _last_traffic_lights 里供绘制与对照。
+            if self.source_type == "carla":
+                try:
+                    _sim_state = ""
+                    _by_motion = {}
+                    if self.carla_source is not None:
+                        _sim_state = self.carla_source.get_controlled_light_state() or ""
+                        _by_motion = self.carla_source.get_controlled_light_states() or {}
+                    if _sim_state:
+                        traffic_light_state = _sim_state
+                        self._light_scope = "carla_sim"
+                    # ★方向感知：对向进口的车流有自己的灯态。
+                    #   少了这一步，实测会出现 4 条**假阳性**闯红灯
+                    #   （对向车合法绿灯通过，却因为「受控进口是红灯」被误判）。
+                    self._light_state_by_motion = dict(_by_motion or {})
+                except Exception as _e:
+                    logger.debug(f"[RealtimeDetector] 读取 CARLA 受控灯态失败: {_e}")
+
             self._light_scope_state = traffic_light_state      # 供 /status 观测
             lane_lines = self._extract_lane_lines(detections)
             
             self.scene_config = {
                 'traffic_light_state': traffic_light_state,
                 'traffic_light_scope': getattr(self, '_light_scope', 'frame'),
+                # ★2026-11-07 新增：按车流方向的灯态（CARLA 源下由仿真真值给出）
+                'traffic_light_state_by_motion': dict(
+                    getattr(self, '_light_state_by_motion', None) or {}),
                 'stop_line_y': int(frame_height * 0.55),
                 'road_direction': 'south',
                 'speed_limit': 60,
@@ -1183,7 +1373,7 @@ class RealtimeViolationDetector:
                            'ppm_ref_y', 'lane_width_px', 'lane_ref_y',
                            'crosswalk_width_m', 'y_horizon_ratio',
                            'frame_width', 'frame_height', 'ground_points',
-                           'traffic_light_roi'):
+                           'traffic_light_roi', '_source'):
                     if _ann.get(_k) is not None:
                         self.scene_config[_k] = _ann[_k]
                 self.scene_config['_annotated_by'] = _ann.get('annotated_by')
@@ -1332,15 +1522,40 @@ class RealtimeViolationDetector:
                     _dup_skipped = 0
                     for v in violations:
                         vt = v.get('violation_type') or v.get('behavior_type') or 'unknown'
-                        first_seen = self._viol_hold.get(vt)
+                        # ★★2026-10-23 由 DSH 修复：确认/冷却的**键从「类型」改成「类型+车辆」**。
+                        #
+                        # 病根（用户反馈：右栏比画面左上角慢很久、快车来不及抓拍）：
+                        #   原来键只有 vt（违规类型）-> 同一类型的确认/冷却状态被**所有车共用**：
+                        #     · A 车首次闯红灯开始 1.5s 确认计时 -> B 车此刻闯红灯，
+                        #       读到的 first_seen 是 A 车的（不为 None 但还不够时长）-> B 车也被压住；
+                        #     · A 车确认通过后进入 8s 冷却 -> 这 8 秒内**任何**车闯红灯都进不了右栏。
+                        #   而画面左上角的【违规】文字读的是 behaviors（规则引擎原始判定，
+                        #   见 get_annotated_frame），**从不经过这两道门** -> 所以它一直很快。
+                        #   两者本质不是同一条链路，这就是左上角立刻有、右栏等很久的全部原因。
+                        #
+                        # 修法与依据：_push_recent_violations() 早就在用
+                        #   (violation_type, vehicle_id/track_id) 做去重键，
+                        #   说明按车归属本来就是本项目的既定口径，只是这两道门没跟上。
+                        # 效果：误报控制逻辑（持续 N 秒才算数）完全不变，
+                        #   只是**不再互相阻塞** —— B 车的确认计时从 B 车自己出现那一刻开始算。
+                        _vid_key = v.get('vehicle_id')
+                        if _vid_key is None:
+                            _vid_key = v.get('track_id')
+                        try:
+                            _vid_key = int(_vid_key) if _vid_key is not None else None
+                        except (TypeError, ValueError):
+                            _vid_key = None
+                        # 拿不到车辆 ID 时退回按类型（保底，不因缺 ID 而永不确认）
+                        vk = (vt, _vid_key) if _vid_key is not None else (vt, None)
+                        first_seen = self._viol_hold.get(vk)
                         if first_seen is None:
-                            self._viol_hold[vt] = _now
-                            continue                       # 首次出现，等待确认
+                            self._viol_hold[vk] = _now
+                            continue                       # 该车该类型首次出现，等待确认
                         if (_now - first_seen) < _hold:
-                            continue                       # 持续不足，继续等待
-                        last = self._viol_last_report.get(vt, 0.0)
+                            continue                       # 该车持续不足，继续等待
+                        last = self._viol_last_report.get(vk, 0.0)
                         if (_now - last) < _cooldown:
-                            continue                       # 冷却期内，不重复上报
+                            continue                       # 该车冷却期内，不重复上报
                         # ★★2026-10-10 由 DSH 新增：**跨圈重复取证抑制**。
                         #
                         # 用户反馈："违规抓拍证据……存在不同步和重复的无意义的取证问题"。
@@ -1399,13 +1614,34 @@ class RealtimeViolationDetector:
                                 _cut = _now_wall - _dedup_sec
                                 for _k in [k for k, ts in self._viol_loop_dedup.items() if ts < _cut]:
                                     self._viol_loop_dedup.pop(_k, None)
-                        self._viol_last_report[vt] = _now
+                        self._viol_last_report[vk] = _now
+                        # ★2026-10-23 由 DSH 补：_viol_last_report 现在按 (类型,车辆) 分键，
+                        #   不再像旧代码那样天然只有 <=11 个键（按类型）。
+                        #   长期运行（摄像头源 / track_id 持续增长）会无界膨胀，故按冷却期清理。
+                        #   冷却期已过的条目留着也没用（下次进来 last 必然已超时）。
+                        if len(self._viol_last_report) > 512:
+                            _lr_cut = _now - max(_cooldown, 1.0)
+                            for _lr_k in [k for k, ts in self._viol_last_report.items() if ts < _lr_cut]:
+                                self._viol_last_report.pop(_lr_k, None)
                         _kept.append(v)
                     if _dup_skipped:
                         logger.info(f"[RealtimeDetector] 跨圈重复取证已抑制 {_dup_skipped} 条"
                                     f"（同一类型+同一位置，{int(_rs.get('loop_dedup_sec', 300))}s 内只报一次）")
-                    _present = {(v.get('violation_type') or v.get('behavior_type') or 'unknown')
-                                for v in violations}
+                    # ★2026-10-23 由 DSH 同步修复：清理用的 _present 必须与 _viol_hold 同键型。
+                    #   否则（旧的纯类型集合）每个元组键都 不 in _present -> 每帧被全删 ->
+                    #   确认时长永远生效不了（首发永远 first_seen=None，永远 continue）。
+                    #   这是改键型时**必须一起改**的隐藏依赖，漏了就等于把这个功能静默关掉。
+                    _present = set()
+                    for v in violations:
+                        _pvt = v.get('violation_type') or v.get('behavior_type') or 'unknown'
+                        _pvid = v.get('vehicle_id')
+                        if _pvid is None:
+                            _pvid = v.get('track_id')
+                        try:
+                            _pvid = int(_pvid) if _pvid is not None else None
+                        except (TypeError, ValueError):
+                            _pvid = None
+                        _present.add((_pvt, _pvid) if _pvid is not None else (_pvt, None))
                     for k in list(self._viol_hold):
                         if k not in _present:
                             del self._viol_hold[k]
@@ -3013,16 +3249,70 @@ class RealtimeViolationDetector:
 
             vi = event.vehicle_info or {}
             sc = event.scene_context or {}
+            # ★2026-11-05 修 B1：原先读 sc.get('traffic_light') / sc.get('lane') /
+            # sc.get('location') —— 这三个键**在 scene_config 里根本不存在**，
+            # 于是 2674/2674 条 evidence_chain 的灯态/停止线/车道/地点/车牌全是默认值。
+            # 实测真实来源（两条都有，按优先级取）：
+            #   ① rule_judgment.evidence.light_state / crossed_stop_line / vehicle_id
+            #      —— 判定当刻的真实值（实测样例 "light_state":"red", "crossed_stop_line":true）
+            #   ② scene_context.traffic_light_state / stop_line_y / road_direction
+            #      —— 场景配置里的标定值
+            # location / lane_id 在 scene_config 里没有对应字段（只有 road_direction /
+            # road_zones / lane_lines），因此改为写可解释的语义值，不再伪装成"有但为空"。
+            _ev = {}
+            try:
+                _rj = getattr(event, 'rule_judgment', None) or {}
+                if isinstance(_rj, dict):
+                    _ev = _rj.get('evidence') or {}
+                    if not isinstance(_ev, dict):
+                        _ev = {}
+            except Exception:
+                _ev = {}
+
+            def _first(*vals):
+                """取第一个"非空且非 unknown"的值"""
+                for v in vals:
+                    if v is None:
+                        continue
+                    s = str(v).strip()
+                    if s and s.lower() not in ('unknown', 'none', 'null'):
+                        return s
+                return ''
+
+            _light = _first(_ev.get('light_state'),
+                            sc.get('traffic_light_state'),
+                            sc.get('traffic_light'))
+            _crossed = _ev.get('crossed_stop_line')
+            if isinstance(_crossed, bool):
+                _stop_rel = 'after' if _crossed else 'before'
+            else:
+                _stop_rel = _first(sc.get('stop_line_relation'))
+            _road_dir = _first(sc.get('road_direction'))
+            # ★2026-11-05 三次修正：`_source` 原本不在 scene_annotation._ALLOWED_KEYS，
+            # load_scene 会把它过滤掉 → 运行时永远读不到。已把 `_source` 加进白名单
+            # （只读元数据，前端不写，安全）。现在它才是可靠的地点来源。
+            # 优先级：_source（视频/流路径，能指回具体点位）> location > camera_id。
+            # 语义：location 是"哪个点位/哪路视频"，scene_config 无路名字段，不伪造路名。
+            _loc = _first(sc.get('_source'),
+                          sc.get('location'),
+                          getattr(event, 'camera_id', None),
+                          sc.get('camera_id'))
+            # 车道号：scene_config 无 lane 编号字段（只有 lane_lines 折线 + road_direction），
+            # 因此用 road_direction 写成"受控方向"标识，可追溯且不伪造车道编号。
+            # 实测 vehicle_direction 在 rule_judgment.evidence 里，一并可用于逆行复核。
+            _lane = _first(sc.get('lane'), sc.get('lane_id'),
+                           sc.get('road_direction'), _ev.get('road_direction'))
+
             chain = EvidenceChain(
                 camera_id=getattr(event, 'camera_id', None) or 'default',
                 timestamp=str(getattr(event, 'trigger_time', '') or ''),
-                location=str(sc.get('location', '') or ''),
+                location=_loc,
                 vehicle_id=int(getattr(event, 'track_id', -1) or -1),
                 vehicle_type=str(vi.get('class_name', 'unknown')),
                 plate_number=str(vi.get('plate_number') or vi.get('plate') or ''),
-                lane_id=str(sc.get('lane', '') or ''),
-                traffic_light_state=str(sc.get('traffic_light', 'unknown')),
-                stop_line_relation=str(sc.get('stop_line_relation', 'unknown')),
+                lane_id=_lane,
+                traffic_light_state=_light or 'unknown',
+                stop_line_relation=_stop_rel or 'unknown',
                 trajectory=list(getattr(event, 'trajectory', None) or []),
                 key_frames=list(getattr(event, 'key_frames', None) or []),
                 event_video_path=str(getattr(event, 'event_video_path', '') or ''),
@@ -3407,6 +3697,12 @@ class RealtimeViolationDetector:
                 'triggered': status_counts['triggered'],
                 'recording': status_counts['recording'],
                 'ai_reviewed': status_counts['ai_reviewed'],
+                # ★2026-11-07 由 WorkBuddy 新增：落库成功/失败计数。
+                #   事件驱动落库一旦失败，内存里有、库里没有 —— 这个计数
+                #   让「静默失效」变成可观测项（不再只能翻日志）。
+                'persist_success': int(getattr(self.event_engine, '_persist_success', 0) or 0),
+                'persist_failures': int(getattr(self.event_engine, '_persist_failures', 0) or 0),
+                'last_persist_error': str(getattr(self.event_engine, '_last_persist_error', '') or ''),
             }
         except Exception as e:
             logger.warning(f"[RealtimeDetector] 获取事件引擎状态失败: {e}")

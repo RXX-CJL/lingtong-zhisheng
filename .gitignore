@@ -55,9 +55,34 @@ _*/
 *.c9
 *.bak
 *.bak-*
+*.bak_*
 *.orig
 *.tmp
 *.swp
+
+# 7) 根目录临时调试产物（2026-11-07 追加：清理 267 个未跟踪文件时发现的漏洞）
+#    这些是排查问题时的一次性脚本与输出，不属于项目资产。
+/_gpt_diag*.ps1
+/_gpt_diag*.txt
+/_gpt_api.ps1
+/_gpt_cfg*.ps1
+/_gpt_cfg*.txt
+/_gpt_probe.html
+/_gpt_diag_out*.txt
+/_c[0-9]*.js
+/_orig-core.js
+/_codex_review.txt
+/_codebuddy_review.txt
+/_qoder_review.txt
+/_verify_ws_push.ps1
+/_HQ_backup_before_delete.tar.gz
+/installer_input.txt
+/*output_gpt_probe.err
+/_dash*.png
+/_reg_*.png
+/dash*.png
+/reg_*.png
+
 
 # 7) 已卸载插件的备份与一次性诊断产物（2026-10-16 追加，纯过程垃圾）
 dsh-workshop-backup/

@@ -74,9 +74,17 @@ set "TUNE_FRAME_RATE=6"
 set "TUNE_MODEL_SEQUENCE=vehicle,traffic_light,helmet,lane"
 set "TUNE_BOX_PREDICTION=1"
 
-rem ---- Python interpreter (deps live in conda env zhitong-gpu) ----
+rem ---- Python interpreter (2026-11-07: Python312 is FIRST, by design) --------
+rem  carla ships only as a cp312 wheel, so the backend must run on 3.12 for the
+rem  CARLA routes to work at all. Measured 2026-11-07 on the same frame:
+rem  ultralytics 8.4.35 (3.12) matches 8.4.103 (3.11) detection-for-detection,
+rem  and opencv 4.10 (3.12) actually FIXES a crash that 5.0 (3.11) causes in
+rem  LaneDetector (HoughLinesP changed shape). See restart-backend.bat for detail.
+rem  Override with ZHITONG_PY=<full path to python.exe>.
 set "PYEXE="
-if exist "C:\miniconda\envs\zhitong-gpu\python.exe" set "PYEXE=C:\miniconda\envs\zhitong-gpu\python.exe"
+if defined ZHITONG_PY set "PYEXE=%ZHITONG_PY%"
+if not defined PYEXE if exist "C:\Users\ROG\AppData\Local\Programs\Python\Python312\python.exe" set "PYEXE=C:\Users\ROG\AppData\Local\Programs\Python\Python312\python.exe"
+if not defined PYEXE if exist "C:\miniconda\envs\zhitong-gpu\python.exe" set "PYEXE=C:\miniconda\envs\zhitong-gpu\python.exe"
 if not defined PYEXE for /f "delims=" %%i in ('where python 2^>nul') do if not defined PYEXE set "PYEXE=%%i"
 if not defined PYEXE set "PYEXE=py -3"
 
@@ -99,9 +107,9 @@ if not errorlevel 1 (
   echo          To restart after code edits: restart-backend.bat
 ) else (
   if "%WITH_RELOAD%"=="1" (
-    start "ZhiTong Backend API" cmd /k cd /d %~dp0 ^&^& set "PYTHONPATH=%~dp0api;%~dp0" ^&^& set "YOLO_IMGSZ=%TUNE_IMGSZ%" ^&^& set "FRAME_RATE=%TUNE_FRAME_RATE%" ^&^& set "YOLO_MODEL_SEQUENCE=%TUNE_MODEL_SEQUENCE%" ^&^& set "BOX_PREDICTION=%TUNE_BOX_PREDICTION%" ^&^& "%PYEXE%" -m uvicorn app:app --host 127.0.0.1 --port 8001 --reload
+    start "ZhiTong Backend API" cmd /k cd /d %~dp0 ^&^& set "PYTHONPATH=%~dp0api;%~dp0" ^&^& set "YOLO_IMGSZ=%TUNE_IMGSZ%" ^&^& set "FRAME_RATE=%TUNE_FRAME_RATE%" ^&^& set "YOLO_MODEL_SEQUENCE=%TUNE_MODEL_SEQUENCE%" ^&^& set "BOX_PREDICTION=%TUNE_BOX_PREDICTION%" ^&^& set "PADDLE_PDX_CACHE_HOME=%PADDLE_PDX_CACHE_HOME%" ^&^& set "PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT=%PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT%" ^&^& set "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=%PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK%" ^&^& "%PYEXE%" -m uvicorn app:app --host 127.0.0.1 --port 8001 --reload
   ) else (
-    start "ZhiTong Backend API" cmd /k cd /d %~dp0 ^&^& set "PYTHONPATH=%~dp0api;%~dp0" ^&^& set "YOLO_IMGSZ=%TUNE_IMGSZ%" ^&^& set "FRAME_RATE=%TUNE_FRAME_RATE%" ^&^& set "YOLO_MODEL_SEQUENCE=%TUNE_MODEL_SEQUENCE%" ^&^& set "BOX_PREDICTION=%TUNE_BOX_PREDICTION%" ^&^& "%PYEXE%" -m uvicorn app:app --host 127.0.0.1 --port 8001
+    start "ZhiTong Backend API" cmd /k cd /d %~dp0 ^&^& set "PYTHONPATH=%~dp0api;%~dp0" ^&^& set "YOLO_IMGSZ=%TUNE_IMGSZ%" ^&^& set "FRAME_RATE=%TUNE_FRAME_RATE%" ^&^& set "YOLO_MODEL_SEQUENCE=%TUNE_MODEL_SEQUENCE%" ^&^& set "BOX_PREDICTION=%TUNE_BOX_PREDICTION%" ^&^& set "PADDLE_PDX_CACHE_HOME=%PADDLE_PDX_CACHE_HOME%" ^&^& set "PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT=%PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT%" ^&^& set "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=%PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK%" ^&^& "%PYEXE%" -m uvicorn app:app --host 127.0.0.1 --port 8001
   )
   echo   started, waiting 5s ...
   timeout /t 5 /nobreak >nul

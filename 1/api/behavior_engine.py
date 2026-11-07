@@ -154,6 +154,49 @@ class BehaviorEngine:
             'trajectory_length': len(history)
         }
 
+    # ------------------------------------------------------------------
+    # ★方向感知灯态（2026-11-07 由 WorkBuddy 新增）
+    #
+    # 为什么需要：一个路口画面里同时有 8~15 盏灯。把**一个**进口的灯态
+    # 当成全场灯态，就会把对向车流（自己的进口是绿灯、合法通过）判成闯红灯。
+    # 实测误报：数据库里 4 条 red_light，轨迹首点 y≈160 —— 正是对向停止线
+    # （受控停止线在 y≈432）。
+    #
+    # 做法：scene_config 里给出按**车流方向**分组的灯态
+    #   {'away': 'red', 'toward': 'green'}
+    # 车辆方向由**画面内的纵向位移**判定（y 变小 = 远离相机，y 变大 = 靠近相机）。
+    # 没有该字段时行为完全不变（视频/摄像头源走原路径）。
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _motion_direction(vehicle: Dict) -> str:
+        """车辆在画面里的运动方向：'away' | 'toward' | ''（判不出）"""
+        history = vehicle.get('history') or []
+        if len(history) < 2:
+            return ''
+        try:
+            y0 = float(history[0]['center'][1])
+            y1 = float(history[-1]['center'][1])
+        except (KeyError, TypeError, ValueError, IndexError):
+            return ''
+        dy = y1 - y0
+        if dy <= -2.0:
+            return 'away'
+        if dy >= 2.0:
+            return 'toward'
+        return ''
+
+    def _light_state_for_vehicle(self, vehicle: Dict, scene_config: Optional[Dict],
+                                 default_state: str) -> str:
+        """按车流方向取该车的灯态；无方向信息或无分组时回退 default_state。"""
+        scene = scene_config or {}
+        by_motion = scene.get('traffic_light_state_by_motion') or {}
+        if not by_motion:
+            return default_state
+        key = self._motion_direction(vehicle)
+        if key and by_motion.get(key):
+            return by_motion[key]
+        return default_state
+
     def analyze_red_light(self, vehicle: Dict, traffic_light_state: str,
                           stop_line_y: int) -> BehaviorResult:
         history = vehicle.get('history', [])
@@ -656,7 +699,8 @@ class BehaviorEngine:
 
         red_light_result = self.analyze_red_light(
             vehicle,
-            scene_config.get('traffic_light_state', ''),
+            self._light_state_for_vehicle(vehicle, scene_config,
+                                          scene_config.get('traffic_light_state', '')),
             scene_config.get('stop_line_y', 400)
         )
         if red_light_result.is_violation:
@@ -689,7 +733,8 @@ class BehaviorEngine:
 
         running_yellow_result = self.analyze_running_yellow(
             vehicle,
-            scene_config.get('traffic_light_state', ''),
+            self._light_state_for_vehicle(vehicle, scene_config,
+                                          scene_config.get('traffic_light_state', '')),
             scene_config.get('stop_line_y', 400)
         )
         if running_yellow_result.is_violation:

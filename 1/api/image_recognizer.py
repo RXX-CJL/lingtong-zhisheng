@@ -1221,8 +1221,13 @@ def analyze_with_doubao(image_input, violation_type, context_prompt=""):
         }]
         
         # 调用大模型
+        # 2026-11-01 修正（DSH）：原硬编码 'qwen3-vl-flash' 在本账号返回
+        #   404 InvalidParameter: Model not exist
+        # 实测该 key 可用的视觉模型是 'qwen3-vl-plus'（能正确读出图中文字）。
+        # 改为环境变量可覆盖，换模型不用改代码：DASHSCOPE_VL_MODEL=qwen3-vl-plus
+        _vl_model = os.environ.get('DASHSCOPE_VL_MODEL', 'qwen3-vl-plus')
         response = dashscope.MultiModalConversation.call(
-            model='qwen3-vl-flash',
+            model=_vl_model,
             messages=messages,
             timeout=30
         )

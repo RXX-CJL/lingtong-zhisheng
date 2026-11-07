@@ -224,6 +224,16 @@ class TrafficEventEngine:
         # 冷却记录：(track_id, event_type) → cooldown_until 时间戳
         self._cooldowns: Dict[tuple, float] = {}
         self._lock = threading.Lock()
+        # ★2026-11-07 由 WorkBuddy 新增：**落库失败的可观测计数**。
+        #   背景（任务二要求核对的一点）：`_persist_event()` 失败时会
+        #   `except` 兜住并只打一条 warning，返回 False；而两个调用点
+        #   （`_trigger_event` / `_update_event_state`）都**忽略返回值** ->
+        #   「事件驱动落库」在 DB 异常时会**静默失效**（内存有、库里没有）。
+        #   现在把失败次数与最后一次错误记下来，供 /status 观测，
+        #   失败仍然是 warning 级日志（可见），但不再"只有人翻日志才知道"。
+        self._persist_failures = 0
+        self._persist_success = 0
+        self._last_persist_error = ""
         logger.info(f"[TrafficEventEngine] 初始化: plugins={len(self.rule_plugins)} "
                     f"frame_buffer={'有' if frame_buffer else '无'} cooldown={cooldown_sec}s "
                     f"clock={'注入' if clock else '墙钟'}")
@@ -330,6 +340,17 @@ class TrafficEventEngine:
             'speed': _num(v_info.get('speed', 0.0)),
             'direction': _num(v_info.get('direction', 0.0)),
             'plate_number': v_info.get('plate_number', ''),
+            # ★2026-11-05 修 B2：tracker 里每辆车都带完整轨迹历史
+            # （vehicle_tracker.MAX_HISTORY = 30），但这里原先只取 7 个字段，
+            # history 在事件引擎门口被丢掉 → _extract_trajectory 只能拿 bbox 中心算 1 个点，
+            # 实测 2674/2674 条事件 trajectory 点数恒为 1，所有轨迹分析失效。
+            # 原样透传，不改结构（判定侧 rule_judgment.evidence 已有 trajectory_length，
+            # 实测最高 30，证明上游确实是完整序列）。
+            'history': v_info.get('history', []) or [],
+            'is_wrong_way': v_info.get('is_wrong_way', False),
+            'first_seen': v_info.get('first_seen'),
+            'last_seen': v_info.get('last_seen'),
+            'frame_count': v_info.get('frame_count', 0),
         }
 
     def _trigger_event(self, violation, vehicle_info: Dict, scene_context: Dict,
@@ -466,18 +487,61 @@ class TrafficEventEngine:
                         setattr(row, k, v)
                     _action = 'UPDATE'
                 db.commit()
+                self._persist_success += 1
                 logger.debug(f"[TrafficEventEngine] 事件落库 {_action} {event.event_id} "
                              f"state={vals['state']}")
                 return True
             finally:
                 db.close()
         except Exception as e:
+            self._persist_failures += 1
+            self._last_persist_error = f"{type(e).__name__}: {str(e)[:150]}"
             logger.warning(f"[TrafficEventEngine] 事件落库失败 {getattr(event,'event_id','?')}: "
                            f"{type(e).__name__}: {str(e)[:150]}")
             return False
 
     def _extract_trajectory(self, vehicle_info: Dict) -> List[Dict[str, Any]]:
-        """从车辆信息提取轨迹点（简化版，真实场景从 tracker 获取）"""
+        """从车辆信息提取轨迹点
+
+        ★2026-11-05 重写（修 B2）：
+        原实现只用 bbox 中心算 **1 个点**，注释还写着"简化版，真实场景从 tracker 获取"
+        —— 但从来没接上。实测 2674/2674 条事件 trajectory 点数恒为 1，
+        导致「视距充分性」「必然压线度」这类需要序列的判据全部无法计算。
+
+        现在优先用 tracker 透传的 history（最多 30 点，含 center/bbox/timestamp/dx/dy）。
+        回退链：history → rule_judgment.evidence 的单点 → bbox 中心。
+        """
+        # ① 首选：tracker 的真实轨迹历史
+        history = vehicle_info.get('history') or []
+        if isinstance(history, list) and len(history) >= 2:
+            pts = []
+            for h in history:
+                if not isinstance(h, dict):
+                    continue
+                c = h.get('center')
+                if isinstance(c, (list, tuple)) and len(c) >= 2:
+                    x, y = float(c[0]), float(c[1])
+                elif isinstance(c, dict):
+                    x, y = float(c.get('x', 0)), float(c.get('y', 0))
+                else:
+                    b = h.get('bbox')
+                    if not (isinstance(b, (list, tuple)) and len(b) >= 4):
+                        continue
+                    x, y = (float(b[0]) + float(b[2])) / 2, (float(b[1]) + float(b[3])) / 2
+                pts.append({
+                    'x': x,
+                    'y': y,
+                    'timestamp': h.get('timestamp', 0),
+                    'bbox': h.get('bbox'),
+                    'dx': h.get('dx', 0),
+                    'dy': h.get('dy', 0),
+                })
+            if len(pts) >= 2:
+                return pts
+            if pts:
+                return pts  # 只有 1 点也照实返回，不伪造
+
+        # ② 回退：bbox 中心单点（保留原行为，仅当确实拿不到 history）
         bbox = vehicle_info.get('bbox', [])
         if not bbox or len(bbox) < 4:
             return []

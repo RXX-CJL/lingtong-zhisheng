@@ -58,7 +58,29 @@ def start_detection(request: StartDetectionRequest):
         )
     # start_camera 内部 cv2.VideoCapture 为阻塞调用，放线程池执行
     try:
-        realtime_detector.start_camera(request.camera_index, request.video_path)
+        # ★2026-11-07 由 DSH 修复（BUG-3，实测踩到）：
+        #   原实现无条件调 start_camera()，而它内部会把 source_type 强制写成
+        #   "camera" 或 "video"（realtime_detector.py:656 / :721），
+        #   于是「先 POST /source {source_type:carla} 再 POST /start」这个顺序
+        #   会把刚设好的 carla 源覆盖掉，转而去开本机摄像头。
+        #   实测证据（8002 端口）：
+        #     /source {carla} -> source_type=carla
+        #     /start          -> source_type=camera, total_frames=124（录了本机摄像头）
+        #   修法：当前源已是 carla 时跳过 start_camera()，直接启动检测循环；
+        #   循环里 _detection_loop 的 carla 分支（:890）负责取帧。
+        cur_src = getattr(realtime_detector, "source_type", None)
+        if cur_src == "carla":
+            cs = getattr(realtime_detector, "carla_source", None)
+            if cs is None or not cs.is_connected():
+                return JSONResponse(
+                    content={
+                        "success": False,
+                        "message": "当前数据源为 CARLA 但未连接，请先调用 /api/realtime/carla/connect",
+                    },
+                    status_code=409,
+                )
+        else:
+            realtime_detector.start_camera(request.camera_index, request.video_path)
         result = realtime_detector.start_detection()
         status_code = 200 if result.get("success") else 409
         return JSONResponse(content=result, status_code=status_code)
@@ -93,29 +115,59 @@ def detect_frame(request: DetectFrameRequest):
     result = realtime_detector.detect_external_frame(request.frame)
     return JSONResponse(content=result)
 
+class WebSocketClientProxy:
+    """WebSocket 的轻量代理（2026-10-23 由 DSH 从 ConnectionManager 内部类提出来）
+
+    修的两个既有缺陷：
+      ① 反注册永远匹配不上：原 _create_client_proxy() 每次调用都 **新建** 一个内部类实例，
+         connect() 注册实例 A、disconnect() 反注册实例 B，而普通对象 a == b 恒为 False
+         -> list.remove(B) 匹配不到 -> web_socket_clients **只增不减**，
+         断开的死连接一直留在列表里被反复推送（每次 send 抛异常并让 push_failed +1）。
+         实测现象：ws_clients=1 但前端其实早断了；push_failed 只增不减。
+      ② 反注册语句被缩进在 if 块内：若 websocket 已不在 active_connections，
+         整条反注册被跳过（见下面的 disconnect 注释）。
+    修法：按底层 websocket 对象判等（__eq__/__hash__），并缓存同一个代理实例。
+    """
+
+    def __init__(self, ws):
+        self.ws = ws
+
+    async def send_json(self, data):
+        await self.ws.send_text(json.dumps(data, ensure_ascii=False))
+
+    def __eq__(self, other):
+        return isinstance(other, WebSocketClientProxy) and other.ws is self.ws
+
+    def __hash__(self):
+        return hash(id(self.ws))
+
+
 class ConnectionManager:
     def __init__(self):
         self.active_connections: list[WebSocket] = []
+        # websocket -> 代理实例，保证注册/反注册用的是**同一个对象**
+        self._proxies: dict = {}
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
-        realtime_detector.register_websocket_client(self._create_client_proxy(websocket))
+        proxy = self._get_client_proxy(websocket)
+        realtime_detector.register_websocket_client(proxy)
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
-            realtime_detector.unregister_websocket_client(self._create_client_proxy(websocket))
+        # ★2026-10-23：反注册必须**在 if 之外**执行。
+        #   原实现在 if 块内，连接一旦不在 active_connections 就整条跳过 -> 死连接残留。
+        proxy = self._proxies.pop(websocket, None)
+        realtime_detector.unregister_websocket_client(proxy or WebSocketClientProxy(websocket))
 
-    def _create_client_proxy(self, websocket):
-        class WebSocketClientProxy:
-            def __init__(self, ws):
-                self.ws = ws
-
-            async def send_json(self, data):
-                await self.ws.send_text(json.dumps(data, ensure_ascii=False))
-
-        return WebSocketClientProxy(websocket)
+    def _get_client_proxy(self, websocket):
+        proxy = self._proxies.get(websocket)
+        if proxy is None:
+            proxy = WebSocketClientProxy(websocket)
+            self._proxies[websocket] = proxy
+        return proxy
 
 manager = ConnectionManager()
 
@@ -671,11 +723,26 @@ def get_vehicles_split():
             _h, _w = (_frame.shape[:2] if _frame is not None else (576, 1280))
             calib = SpeedCalibrator(scene, frame_width=_w, frame_height=_h)
             _speed_info = calib.info()
-        except Exception:
+        except Exception as _calib_err:
+            # ★2026-11-07 由 WorkBuddy 修正（静默失败 -> 可见）：
+            #   原来这里是裸 `except Exception:`，**不留任何日志**。
+            #   实测后果：/vehicles 的 speed_calibration 变成 {}、
+            #   所有车辆都没有 speed_kmh —— 现场表现为「测速永远没有数据」，
+            #   却查不到任何原因（本次任务排查测速时撞上）。
+            #   保留原有降级行为（不拖垮接口），但把异常打出来。
+            logger.warning(f"[realtime.vehicles] 测速标定初始化失败（降级：不显示测速）: "
+                           f"{type(_calib_err).__name__}: {_calib_err}")
             SpeedCalibrator = None
             speed_from_history = None
             calib = None
-            _speed_info = {}
+            # ★把失败原因**放进响应体**：项目日志只落 INFO 级，warning 进不了日志文件，
+            #   光靠日志仍然查不到（实测：改完 warning 后日志里仍是 0 条 WARNING）。
+            #   现在接口直接告诉调用方「为什么没有测速」。
+            _speed_info = {
+                "error": f"{type(_calib_err).__name__}: {_calib_err}",
+                "calibrated": False,
+                "method": "unavailable",
+            }
 
         for tid, veh in tracked.items():
             try:
@@ -1272,6 +1339,9 @@ def carla_next_scene(request: CarlaSceneRequest):
                 "success": True,
                 "scene": "violation",
                 "violator_actor_id": actor_id,
+                # ★2026-11-07 由 WorkBuddy 新增：把违规车的真实世界证据返回，
+                #   便于外部脚本核对「它是否真的朝受控红灯开过停止线」。
+                "violator": src.get_violator_state(),
                 "message": "已生成一辆闯红灯车辆",
             })
         except Exception as e:
@@ -1287,11 +1357,28 @@ def carla_actors():
         return JSONResponse(content={"success": False, "actors": [], "message": "CARLA 未连接"})
     actors = src.get_actors_state()
     lights = src.get_traffic_lights()
+    # ★2026-11-07 由 WorkBuddy 新增：违规车会话 + 受控红灯进口（取证用）
+    violator = {}
+    approach = {}
+    try:
+        violator = src.get_violator_state() or {}
+        ap = src.get_controlled_approach() or {}
+        approach = {
+            "light_id": ap.get("light_id"),
+            "lane": ap.get("lane"),
+            "stop_point_world": ap.get("stop_point"),
+            "stop_line_pixel": ap.get("stop_pixel"),
+            "stop_depth_m": ap.get("stop_depth_m"),
+        }
+    except Exception as e:
+        approach = {"error": str(e)[:120]}
     return JSONResponse(content={
         "success": True,
         "actors": actors,
         "actor_count": len(actors),
         "traffic_lights": lights,
+        "violator": violator,
+        "controlled_approach": approach,
     })
 
 

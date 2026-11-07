@@ -227,19 +227,49 @@ class LicensePlateRecognizer:
             enhanced = self._enhance_plate_image(image)
 
             # PaddleOCR 识别
-            result = self._ocr_engine.ocr(enhanced, cls=True)
+            # ★2026-11-07 由 DSH 修复（PaddleOCR 3.x 兼容，实测踩到）：
+            #   原实现是 `self._ocr_engine.ocr(enhanced, cls=True)` + 按 2.x 的
+            #   `[[ [box], (text, conf) ], ...]` 结构解析。PaddleOCR 3.7.0 实际行为：
+            #     · ocr() 只是 predict() 的别名，**不接受 cls 关键字**
+            #       -> TypeError: predict() got an unexpected keyword argument 'cls'
+            #     · 这个异常被下面的 except 吞掉 -> 永远返回空车牌，且只留一行 warning
+            #   实测证据（合成蓝牌 "JING A 12345"，F 盘缓存 + 关 mkldnn）：
+            #     predict() 返回 [{'rec_texts': ['JING A 12345'], 'rec_scores': [0.99921]}]
+            #   现在两种结构都兼容，且按版本选择调用方式。
+            try:
+                result = self._ocr_engine.predict(
+                    cv2.cvtColor(enhanced, cv2.COLOR_BGR2RGB)
+                    if enhanced.ndim == 3 and enhanced.shape[2] == 3 else enhanced
+                )
+            except AttributeError:
+                # 极旧版本没有 predict()，退回 ocr()
+                result = self._ocr_engine.ocr(enhanced)
 
-            if not result or len(result) == 0:
+            if not result:
                 return {'plate_number': '', 'confidence': 0.0}
 
             texts = []
             total_conf = 0.0
             count = 0
 
-            for line in result[0]:
-                if len(line) >= 2:
-                    text = line[1][0]
-                    conf = line[1][1]
+            def _iter_text_conf(res_item):
+                """把 2.x / 3.x 两种返回结构统一成 (text, score) 迭代器。"""
+                if isinstance(res_item, dict):
+                    # 3.x: {'rec_texts': [...], 'rec_scores': [...]}
+                    t = res_item.get('rec_texts') or []
+                    s = res_item.get('rec_scores') or []
+                    for i, txt in enumerate(t):
+                        yield txt, (s[i] if i < len(s) else 0.0)
+                else:
+                    # 2.x: [[box], (text, conf)] 的列表
+                    for line in res_item or []:
+                        if isinstance(line, (list, tuple)) and len(line) >= 2:
+                            payload = line[1]
+                            if isinstance(payload, (list, tuple)) and len(payload) >= 2:
+                                yield payload[0], payload[1]
+
+            for _res in result:
+                for text, conf in _iter_text_conf(_res):
                     if text and conf > 0.3:
                         # 清理文本
                         cleaned = self._clean_plate_text(text)

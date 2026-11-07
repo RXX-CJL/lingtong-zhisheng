@@ -74,7 +74,14 @@ _ALLOWED_KEYS = ("crosswalk_zones", "lane_lines", "stop_line_y",
                  # 在画面上的区域。闯红灯判定只认 ROI 内的灯态。
                  # 不标的后果（实测）：画面里任意一盏红灯（含横向车道、CAM-2 小窗）
                  # 都会被当成"本方向红灯" -> 演示视频每循环误报 5~6 次。
-                 "traffic_light_roi")
+                 "traffic_light_roi",
+                 # --- 来源标识（2026-11-05 由 DSH 新增）---
+                 # 为什么必须加进白名单：save_scene 会无条件写入 `_source`（视频路径/流URL），
+                 # 但 load_scene 只保留本白名单内的键 → 运行时读回的 scene_config 里
+                 # **永远没有 `_source`**。后果（实测）：证据链 location 一直为空，
+                 # 因为没有任何"这是哪个点位"的可追溯标识。
+                 # 只读元数据，前端不写它，加进白名单安全。
+                 "_source")
 
 
 def video_key(source: str) -> str:
