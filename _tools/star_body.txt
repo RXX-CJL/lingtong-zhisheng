@@ -1,0 +1,47 @@
+    // ── 恒星本体（2026-11-01 重做：从「行星」改成「恒星」）──
+    // 用户说「橙黄黑配色，换掉」。查下来真因是：这段代码画的是**行星**——
+    //   lightFall 距离衰减 + planetshine 地照 + 晨昏线暖边 + 夜面深蓝黑
+    // 这是给「反射别人光的石头」用的模型。
+    // 但这里的每颗星都是**恒星**：自己发光，没有暗面，没有晨昏线，没有谁照它。
+    // 行星模型套在恒星上，必然出现「半边亮半边黑 + 中间一条橙色」——就是用户看到的诡异配色。
+    //
+    // 恒星该长什么样（真实天体）：
+    //   ① 光球层：整体均匀发光，中心因视线穿过的光球层更厚而更亮（临边昏暗 limb darkening）
+    //   ② 色球层/日冕：一层同色系的柔光，向外衰减
+    //   ③ 颜色由表面温度决定 —— 已经在数据里（SPECTRUM 红矮→蓝白），这里只负责发光方式
+    // 所以：不要暗面，不要晨昏线，只要「中心亮 → 边缘稍暗 → 外面一圈 halo」，全用本星自己的颜色。
+    {
+      const toSunX = sfx - p.sx, toSunY = sfy - p.sy;
+      const distToSun = Math.hypot(toSunX, toSunY) || 1;
+      // 越靠近银心越亮：这不是「被照亮」，是星口密度更高、视线更深。
+      const lightFall = 1 / (1 + distToSun / 320);
+      const bodyA = Math.min(1, a * 1.15) * (0.62 + 0.38 * lightFall);
+      // ① 日冕/色球：同色柔光，向外两倍半径衰减（恒星的「大气」）
+      if (r > 1.6) {
+        const CR = r * 2.6;
+        const cg = ctx.createRadialGradient(p.sx, p.sy, r * 0.5, p.sx, p.sy, CR);
+        cg.addColorStop(0, hexA(drawColor, Math.min(1, 0.34 * bodyA)));
+        cg.addColorStop(0.35, hexA(drawColor, Math.min(1, 0.13 * bodyA)));
+        cg.addColorStop(1, hexA(drawColor, 0));
+        ctx.beginPath(); ctx.arc(p.sx, p.sy, CR, 0, 6.284);
+        ctx.fillStyle = cg; ctx.fill();
+      }
+      // ② 光球：中心偏白（高温核心），边缘回到本星颜色，alpha 全程不透明 —— 恒星没有透明的时候
+      const core = ctx.createRadialGradient(p.sx, p.sy, 0, p.sx, p.sy, r);
+      core.addColorStop(0,   hexA(drawColor, Math.min(1, bodyA * 0.98)));
+      core.addColorStop(0.45, hexA(drawColor, Math.min(1, bodyA * 0.88)));
+      core.addColorStop(0.86, hexA(drawColor, Math.min(1, bodyA * 0.70)));
+      core.addColorStop(1,   hexA(drawColor, Math.min(1, bodyA * 0.44)));   // 临边昏暗，不是黑
+      ctx.beginPath(); ctx.arc(p.sx, p.sy, r, 0, 6.284);
+      ctx.fillStyle = core; ctx.fill();
+      // ③ 核心白热：只有够大的星才画，否则 300 颗尘埃各点一个白点 = 噪点
+      if (r > 2.4) {
+        const hr = r * 0.42;
+        const hl = ctx.createRadialGradient(p.sx, p.sy, 0, p.sx, p.sy, hr);
+        hl.addColorStop(0, "rgba(255,252,246," + (0.62 * bodyA) + ")");
+        hl.addColorStop(0.45, "rgba(255,248,235," + (0.22 * bodyA) + ")");
+        hl.addColorStop(1, "rgba(255,245,230,0)");
+        ctx.beginPath(); ctx.arc(p.sx, p.sy, hr, 0, 6.284);
+        ctx.fillStyle = hl; ctx.fill();
+      }
+    }

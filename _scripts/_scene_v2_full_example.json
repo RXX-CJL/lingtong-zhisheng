@@ -1,0 +1,148 @@
+{
+  "format": "carla_creator_workshop_scene_v2",
+  "map": "Town10HD_Opt",
+  "weather": {
+    "cloudiness": 77.0,
+    "precipitation": 33.0,
+    "precipitation_deposits": 0.0,
+    "wind_intensity": 10.0,
+    "sun_azimuth_angle": 202.0,
+    "sun_altitude_angle": 17.0,
+    "fog_density": 21.0,
+    "fog_distance": 0.75,
+    "fog_falloff": 0.10000000149011612,
+    "wetness": 44.0,
+    "scattering_intensity": 1.0,
+    "mie_scattering_scale": 0.029999999329447746,
+    "rayleigh_scattering_scale": 0.03310000151395798,
+    "dust_storm": 0.0
+  },
+  "vehicles": [
+    {
+      "blueprint": "vehicle.tesla.model3",
+      "transform": {
+        "location": {
+          "x": -64.64484405517578,
+          "y": 24.471010208129883,
+          "z": 0.59501713514328
+        },
+        "rotation": {
+          "pitch": 0.0,
+          "yaw": 0.15919795632362366,
+          "roll": 0.0
+        }
+      },
+      "autopilot": true,
+      "behavior_mode": "obey",
+      "target_speed_kmh": 40.0,
+      "ignore_lights_percent": null
+    },
+    {
+      "blueprint": "vehicle.tesla.model3",
+      "transform": {
+        "location": {
+          "x": -103.17900085449219,
+          "y": -14.434906959533691,
+          "z": 0.59501713514328
+        },
+        "rotation": {
+          "pitch": 0.0,
+          "yaw": -89.35775756835938,
+          "roll": 0.0
+        }
+      },
+      "autopilot": false,
+      "behavior_mode": "parked",
+      "target_speed_kmh": null,
+      "ignore_lights_percent": null
+    },
+    {
+      "blueprint": "vehicle.tesla.model3",
+      "transform": {
+        "location": {
+          "x": -111.120361328125,
+          "y": 72.89886474609375,
+          "z": 0.5950172543525696
+        },
+        "rotation": {
+          "pitch": 0.0,
+          "yaw": 90.6422348022461,
+          "roll": 0.0
+        }
+      },
+      "autopilot": false,
+      "behavior_mode": "run_light",
+      "target_speed_kmh": null,
+      "ignore_lights_percent": null
+    }
+  ],
+  "props": [
+    {
+      "blueprint": "static.prop.constructioncone",
+      "transform": {
+        "location": {
+          "x": -113.40350341796875,
+          "y": -25.76747703552246,
+          "z": 0.7499950528144836
+        },
+        "rotation": {
+          "pitch": 0.0,
+          "yaw": 0.0,
+          "roll": 0.0
+        }
+      }
+    }
+  ],
+  "traffic_lights": {
+    "opendrive_id": "960",
+    "group_actor_ids": [
+      9,
+      20,
+      18
+    ],
+    "durations": {
+      "Green": 12.0,
+      "Yellow": 2.0,
+      "Red": 15.0
+    },
+    "phase": "Green",
+    "running": true
+  },
+  "camera": {
+    "fov": 90.0,
+    "image_size_x": 960,
+    "image_size_y": 540,
+    "transform": {
+      "location": {
+        "x": -78.64484405517578,
+        "y": 16.47101593017578,
+        "z": 9.001717567443848
+      },
+      "rotation": {
+        "pitch": -21.000001907348633,
+        "yaw": 123.50003051757812,
+        "roll": 9.145153967438091e-07
+      }
+    }
+  },
+  "hidden_environment_objects": {
+    "Buildings": [
+      16740775638937321093,
+      15364796654548762122
+    ],
+    "Vegetation": [
+      16740260845389644291
+    ]
+  },
+  "session": {
+    "selected_vehicle_index": 1,
+    "selected_vehicle_id": 134,
+    "global_speed_diff_percent": "-12",
+    "target_speed_kmh": "30",
+    "ignore_lights_percent": "0",
+    "record_fps": "15",
+    "camera_resolution": "960x540",
+    "spawn_autopilot_default": true
+  },
+  "saved_at": "2026-10-23 23:28:30"
+}

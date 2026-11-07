@@ -1,0 +1,40 @@
+{
+  "format": "carla_workshop_recipe_v1",
+  "title": "冒烟测试：摆车 + 录 5 秒",
+  "hide": [
+    {
+      "action": "range",
+      "label": "Vegetation",
+      "radius": 40,
+      "mode": "球体"
+    }
+  ],
+  "actions": [
+    {
+      "t": 0,
+      "do": "log",
+      "text": "开始"
+    },
+    {
+      "t": 0,
+      "do": "show_all"
+    },
+    {
+      "t": 1,
+      "do": "wait",
+      "seconds": 1
+    }
+  ],
+  "record": {
+    "seconds": 5,
+    "fps": 20,
+    "resolution": "960x540",
+    "out": "E:\\output\\1\\carla\\仿真输出\\_selftest_recipe.mp4"
+  },
+  "cleanup": {
+    "restore_hidden": true,
+    "restore_traffic_lights": true,
+    "destroy_vehicles": true,
+    "restore_camera": true
+  }
+}

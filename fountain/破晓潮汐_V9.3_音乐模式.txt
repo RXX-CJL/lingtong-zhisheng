@@ -1,0 +1,743 @@
+﻿' =============================================================
+' 破晓·潮汐 V9 - 规整水柱版 / 11喷头 / 三场景
+' 后台任务周期：50ms；连续演出：40秒（12.5+17.5+10秒）
+' ControlMode=0：连续演出；ControlMode=1：单场景循环；ControlMode=2：音乐响应
+' 音乐模式：M1..M11（Modbus 4区 地址0..10）由外部程序每100ms写入目标高度
+' SceneSelect=1/2/3；RunState=1运行；StopOK=0停止；EStopOK=0急停
+' Height1..Height11：实际水柱高度；TargetHeight1..TargetHeight11：目标高度
+' 灯光感应恢复：对应喷头Height>0时对应灯亮，Height=0时熄灭。
+' 说明：脚本未在实际MCGS运行环境验证，请先另存工程副本后测试。
+' =============================================================
+
+' 1. 停止与急停优先；停止信号为0时强制停止
+IF StopOK = 0 THEN
+    RunState = 0
+ENDIF
+IF EStopOK = 0 THEN
+    RunState = 0
+ENDIF
+IF SceneSelect < 1 THEN
+    SceneSelect = 1
+ENDIF
+IF SceneSelect > 3 THEN
+    SceneSelect = 3
+ENDIF
+
+' 模式指示灯状态：单场景模式显示所选模式；连续模式灯只在连续演出运行时亮
+IF ControlMode = 1 THEN
+    SingleModeLamp = 1
+ELSE
+    SingleModeLamp = 0
+ENDIF
+IF ControlMode = 0 AND RunState = 1 AND StopOK = 1 AND EStopOK = 1 THEN
+    ContinuousModeLamp = 1
+ELSE
+    ContinuousModeLamp = 0
+ENDIF
+
+' ---- 音乐模式（ControlMode=2）：由外部程序经 Modbus 4区写入 M1..M11 ----
+' 模式值夹紧，防止越界值导致三个模式全不匹配
+IF ControlMode < 0 THEN
+    ControlMode = 0
+ENDIF
+IF ControlMode > 2 THEN
+    ControlMode = 2
+ENDIF
+IF ControlMode = 2 AND RunState = 1 AND StopOK = 1 AND EStopOK = 1 THEN
+    MusicModeLamp = 1
+ELSE
+    MusicModeLamp = 0
+ENDIF
+
+' 2. 停止态：复位计时、目标高度、实际高度和泵状态
+IF RunState = 0 THEN
+    RunTimer = 0
+    StepCounter = 0
+    Phase1 = 0
+    Phase2 = 0
+    Phase3 = 0
+    Height1 = 0
+    TargetHeight1 = 0
+    Pump1 = 0
+    Height2 = 0
+    TargetHeight2 = 0
+    Pump2 = 0
+    Height3 = 0
+    TargetHeight3 = 0
+    Pump3 = 0
+    Height4 = 0
+    TargetHeight4 = 0
+    Pump4 = 0
+    Height5 = 0
+    TargetHeight5 = 0
+    Pump5 = 0
+    Height6 = 0
+    TargetHeight6 = 0
+    Pump6 = 0
+    Height7 = 0
+    TargetHeight7 = 0
+    Pump7 = 0
+    Height8 = 0
+    TargetHeight8 = 0
+    Pump8 = 0
+    Height9 = 0
+    TargetHeight9 = 0
+    Pump9 = 0
+    Height10 = 0
+    TargetHeight10 = 0
+    Pump10 = 0
+    Height11 = 0
+    TargetHeight11 = 0
+    Pump11 = 0
+ENDIF
+
+' 3. 运行演出：每周期先清空目标，再按当前场景重新赋值
+IF RunState = 1 THEN
+    ' 音乐模式不推进演出计时器，否则切回连续演出时场景位置会错
+    IF ControlMode <> 2 THEN
+        RunTimer = RunTimer + 1
+    ENDIF
+    IF ControlMode = 0 THEN
+        IF RunTimer >= 800 THEN
+            RunTimer = 0
+        ENDIF
+    ELSE
+        IF SceneSelect = 1 AND RunTimer >= 250 THEN
+            RunTimer = 0
+        ENDIF
+        IF SceneSelect = 2 AND RunTimer >= 350 THEN
+            RunTimer = 0
+        ENDIF
+        IF SceneSelect = 3 AND RunTimer >= 200 THEN
+            RunTimer = 0
+        ENDIF
+    ENDIF
+    ' 注意：运行过程中不再每周期先把全部灯光清零。
+    ' 先清零再点亮会在同一个50ms扫描周期内产生0->1反复写入，可能造成屏闪。
+    TargetHeight1 = 0
+    TargetHeight2 = 0
+    TargetHeight3 = 0
+    TargetHeight4 = 0
+    TargetHeight5 = 0
+    TargetHeight6 = 0
+    TargetHeight7 = 0
+    TargetHeight8 = 0
+    TargetHeight9 = 0
+    TargetHeight10 = 0
+    TargetHeight11 = 0
+
+    ' ---- 音乐模式：直接采用外部写入的目标高度 ----
+    ' 不再做平滑：外部已做过 attack/release，且下面的高度平滑层会再处理一遍
+    IF ControlMode = 2 THEN
+        TargetHeight1 = M1
+        TargetHeight2 = M2
+        TargetHeight3 = M3
+        TargetHeight4 = M4
+        TargetHeight5 = M5
+        TargetHeight6 = M6
+        TargetHeight7 = M7
+        TargetHeight8 = M8
+        TargetHeight9 = M9
+        TargetHeight10 = M10
+        TargetHeight11 = M11
+    ENDIF
+
+    ' 场景1：环形追逐。外圈1-6依次接力，内圈7-10错位加入，中心11最后抬升。
+    ' 以RunTimer/5形成每0.25秒一个节拍；相邻水柱短暂重叠，视觉更连贯。
+    IF ControlMode <> 2 AND ((ControlMode = 1 AND SceneSelect = 1) OR (ControlMode = 0 AND RunTimer < 250)) THEN
+        Phase1 = 1
+        IF ControlMode = 1 THEN
+            StepCounter = RunTimer / 5
+        ELSE
+            StepCounter = RunTimer / 5
+        ENDIF
+        IF StepCounter >= 50 THEN
+            StepCounter = 0
+        ENDIF
+        IF StepCounter >= 0 AND StepCounter < 10 THEN
+            TargetHeight1 = 100
+        ENDIF
+        IF StepCounter >= 7 AND StepCounter < 17 THEN
+            TargetHeight2 = 100
+        ENDIF
+        IF StepCounter >= 14 AND StepCounter < 24 THEN
+            TargetHeight3 = 100
+        ENDIF
+        IF StepCounter >= 21 AND StepCounter < 31 THEN
+            TargetHeight4 = 100
+        ENDIF
+        IF StepCounter >= 28 AND StepCounter < 38 THEN
+            TargetHeight5 = 100
+        ENDIF
+        IF StepCounter >= 35 AND StepCounter < 45 THEN
+            TargetHeight6 = 100
+        ENDIF
+        IF StepCounter >= 4 AND StepCounter < 16 THEN
+            TargetHeight7 = 65
+        ENDIF
+        IF StepCounter >= 14 AND StepCounter < 26 THEN
+            TargetHeight8 = 65
+        ENDIF
+        IF StepCounter >= 24 AND StepCounter < 36 THEN
+            TargetHeight9 = 65
+        ENDIF
+        IF StepCounter >= 34 AND StepCounter < 46 THEN
+            TargetHeight10 = 65
+        ENDIF
+        IF StepCounter >= 35 AND StepCounter < 50 THEN
+            TargetHeight11 = 100
+        ENDIF
+    ENDIF
+
+    ' 场景2：对称阶梯潮汐。四段清晰变化：低位->中位->高位->回落。
+    ' 外圈1-6始终同高，内圈7-10始终同高，中心11独立抬升，避免杂乱错位。
+    IF ControlMode <> 2 AND ((ControlMode = 1 AND SceneSelect = 2) OR (ControlMode = 0 AND RunTimer >= 250 AND RunTimer < 600)) THEN
+        Phase2 = 1
+        IF ControlMode = 1 THEN
+            StepCounter = RunTimer / 5
+        ELSE
+            StepCounter = (RunTimer - 250) / 5
+        ENDIF
+        IF StepCounter >= 70 THEN
+            StepCounter = 0
+        ENDIF
+        IF StepCounter < 18 THEN
+            TargetHeight1 = 35
+            TargetHeight2 = 35
+            TargetHeight3 = 35
+            TargetHeight4 = 35
+            TargetHeight5 = 35
+            TargetHeight6 = 35
+            TargetHeight7 = 15
+            TargetHeight8 = 15
+            TargetHeight9 = 15
+            TargetHeight10 = 15
+            TargetHeight11 = 50
+        ELSE
+            IF StepCounter < 36 THEN
+                TargetHeight1 = 65
+                TargetHeight2 = 65
+                TargetHeight3 = 65
+                TargetHeight4 = 65
+                TargetHeight5 = 65
+                TargetHeight6 = 65
+                TargetHeight7 = 40
+                TargetHeight8 = 40
+                TargetHeight9 = 40
+                TargetHeight10 = 40
+                TargetHeight11 = 70
+            ELSE
+                IF StepCounter < 53 THEN
+                    TargetHeight1 = 100
+                    TargetHeight2 = 100
+                    TargetHeight3 = 100
+                    TargetHeight4 = 100
+                    TargetHeight5 = 100
+                    TargetHeight6 = 100
+                    TargetHeight7 = 70
+                    TargetHeight8 = 70
+                    TargetHeight9 = 70
+                    TargetHeight10 = 70
+                    TargetHeight11 = 100
+                ELSE
+                    TargetHeight1 = 65
+                    TargetHeight2 = 65
+                    TargetHeight3 = 65
+                    TargetHeight4 = 65
+                    TargetHeight5 = 65
+                    TargetHeight6 = 65
+                    TargetHeight7 = 40
+                    TargetHeight8 = 40
+                    TargetHeight9 = 40
+                    TargetHeight10 = 40
+                    TargetHeight11 = 70
+                ENDIF
+            ENDIF
+        ENDIF
+    ENDIF
+
+    ' 场景3：快速潮汐收束。比上一版快一倍：单场景10秒，连续演出中10秒。
+    ' 采用两拍一组的对称推进，先外围分组升高，再内圈与中心抬升，最后快速收束。
+    IF ControlMode <> 2 AND ((ControlMode = 1 AND SceneSelect = 3) OR (ControlMode = 0 AND RunTimer >= 600)) THEN
+        Phase3 = 1
+        IF ControlMode = 1 THEN
+            StepCounter = RunTimer / 5
+        ELSE
+            StepCounter = (RunTimer - 600) / 5
+        ENDIF
+        IF StepCounter >= 40 THEN
+            StepCounter = 0
+        ENDIF
+        IF StepCounter < 6 THEN
+            TargetHeight1 = 50
+            TargetHeight2 = 50
+            TargetHeight3 = 50
+            TargetHeight4 = 50
+            TargetHeight5 = 50
+            TargetHeight6 = 50
+        ELSE
+            IF StepCounter < 12 THEN
+                TargetHeight1 = 80
+                TargetHeight2 = 80
+                TargetHeight3 = 80
+                TargetHeight4 = 80
+                TargetHeight5 = 80
+                TargetHeight6 = 80
+            ELSE
+                IF StepCounter < 18 THEN
+                    TargetHeight1 = 100
+                    TargetHeight2 = 100
+                    TargetHeight3 = 100
+                    TargetHeight4 = 100
+                    TargetHeight5 = 100
+                    TargetHeight6 = 100
+                ELSE
+                    TargetHeight1 = 35
+                    TargetHeight2 = 35
+                    TargetHeight3 = 35
+                    TargetHeight4 = 35
+                    TargetHeight5 = 35
+                    TargetHeight6 = 35
+                ENDIF
+            ENDIF
+        ENDIF
+        IF StepCounter >= 8 AND StepCounter < 18 THEN
+            TargetHeight7 = 60
+            TargetHeight8 = 60
+            TargetHeight9 = 60
+            TargetHeight10 = 60
+        ENDIF
+        IF StepCounter >= 18 AND StepCounter < 28 THEN
+            TargetHeight7 = 85
+            TargetHeight8 = 85
+            TargetHeight9 = 85
+            TargetHeight10 = 85
+        ENDIF
+        IF StepCounter >= 28 AND StepCounter < 34 THEN
+            TargetHeight7 = 35
+            TargetHeight8 = 35
+            TargetHeight9 = 35
+            TargetHeight10 = 35
+        ENDIF
+        IF StepCounter >= 14 AND StepCounter < 28 THEN
+            TargetHeight11 = 100
+        ENDIF
+        IF StepCounter >= 28 AND StepCounter < 34 THEN
+            TargetHeight11 = 45
+        ENDIF
+        IF StepCounter >= 34 THEN
+            TargetHeight1 = 0
+            TargetHeight2 = 0
+            TargetHeight3 = 0
+            TargetHeight4 = 0
+            TargetHeight5 = 0
+            TargetHeight6 = 0
+            TargetHeight7 = 0
+            TargetHeight8 = 0
+            TargetHeight9 = 0
+            TargetHeight10 = 0
+            TargetHeight11 = 0
+        ENDIF
+    ENDIF
+
+    ' 4. 高度平滑层：每个50ms周期变化4单位，100单位约1.25秒
+    IF Height1 < TargetHeight1 THEN
+        Height1 = Height1 + 6
+        IF Height1 > TargetHeight1 THEN
+            Height1 = TargetHeight1
+        ENDIF
+    ELSE
+        IF Height1 > TargetHeight1 THEN
+            Height1 = Height1 - 6
+            IF Height1 < TargetHeight1 THEN
+                Height1 = TargetHeight1
+            ENDIF
+        ENDIF
+    ENDIF
+    IF Height2 < TargetHeight2 THEN
+        Height2 = Height2 + 6
+        IF Height2 > TargetHeight2 THEN
+            Height2 = TargetHeight2
+        ENDIF
+    ELSE
+        IF Height2 > TargetHeight2 THEN
+            Height2 = Height2 - 6
+            IF Height2 < TargetHeight2 THEN
+                Height2 = TargetHeight2
+            ENDIF
+        ENDIF
+    ENDIF
+    IF Height3 < TargetHeight3 THEN
+        Height3 = Height3 + 6
+        IF Height3 > TargetHeight3 THEN
+            Height3 = TargetHeight3
+        ENDIF
+    ELSE
+        IF Height3 > TargetHeight3 THEN
+            Height3 = Height3 - 6
+            IF Height3 < TargetHeight3 THEN
+                Height3 = TargetHeight3
+            ENDIF
+        ENDIF
+    ENDIF
+    IF Height4 < TargetHeight4 THEN
+        Height4 = Height4 + 6
+        IF Height4 > TargetHeight4 THEN
+            Height4 = TargetHeight4
+        ENDIF
+    ELSE
+        IF Height4 > TargetHeight4 THEN
+            Height4 = Height4 - 6
+            IF Height4 < TargetHeight4 THEN
+                Height4 = TargetHeight4
+            ENDIF
+        ENDIF
+    ENDIF
+    IF Height5 < TargetHeight5 THEN
+        Height5 = Height5 + 6
+        IF Height5 > TargetHeight5 THEN
+            Height5 = TargetHeight5
+        ENDIF
+    ELSE
+        IF Height5 > TargetHeight5 THEN
+            Height5 = Height5 - 6
+            IF Height5 < TargetHeight5 THEN
+                Height5 = TargetHeight5
+            ENDIF
+        ENDIF
+    ENDIF
+    IF Height6 < TargetHeight6 THEN
+        Height6 = Height6 + 6
+        IF Height6 > TargetHeight6 THEN
+            Height6 = TargetHeight6
+        ENDIF
+    ELSE
+        IF Height6 > TargetHeight6 THEN
+            Height6 = Height6 - 6
+            IF Height6 < TargetHeight6 THEN
+                Height6 = TargetHeight6
+            ENDIF
+        ENDIF
+    ENDIF
+    IF Height7 < TargetHeight7 THEN
+        Height7 = Height7 + 6
+        IF Height7 > TargetHeight7 THEN
+            Height7 = TargetHeight7
+        ENDIF
+    ELSE
+        IF Height7 > TargetHeight7 THEN
+            Height7 = Height7 - 6
+            IF Height7 < TargetHeight7 THEN
+                Height7 = TargetHeight7
+            ENDIF
+        ENDIF
+    ENDIF
+    IF Height8 < TargetHeight8 THEN
+        Height8 = Height8 + 6
+        IF Height8 > TargetHeight8 THEN
+            Height8 = TargetHeight8
+        ENDIF
+    ELSE
+        IF Height8 > TargetHeight8 THEN
+            Height8 = Height8 - 6
+            IF Height8 < TargetHeight8 THEN
+                Height8 = TargetHeight8
+            ENDIF
+        ENDIF
+    ENDIF
+    IF Height9 < TargetHeight9 THEN
+        Height9 = Height9 + 6
+        IF Height9 > TargetHeight9 THEN
+            Height9 = TargetHeight9
+        ENDIF
+    ELSE
+        IF Height9 > TargetHeight9 THEN
+            Height9 = Height9 - 6
+            IF Height9 < TargetHeight9 THEN
+                Height9 = TargetHeight9
+            ENDIF
+        ENDIF
+    ENDIF
+    IF Height10 < TargetHeight10 THEN
+        Height10 = Height10 + 6
+        IF Height10 > TargetHeight10 THEN
+            Height10 = TargetHeight10
+        ENDIF
+    ELSE
+        IF Height10 > TargetHeight10 THEN
+            Height10 = Height10 - 6
+            IF Height10 < TargetHeight10 THEN
+                Height10 = TargetHeight10
+            ENDIF
+        ENDIF
+    ENDIF
+    IF Height11 < TargetHeight11 THEN
+        Height11 = Height11 + 6
+        IF Height11 > TargetHeight11 THEN
+            Height11 = TargetHeight11
+        ENDIF
+    ELSE
+        IF Height11 > TargetHeight11 THEN
+            Height11 = Height11 - 6
+            IF Height11 < TargetHeight11 THEN
+                Height11 = TargetHeight11
+            ENDIF
+        ENDIF
+    ENDIF
+    ' 5. 水泵状态跟随实际高度；水柱位置灯独立由各场景控制
+    IF Height1 > 0 THEN
+        Pump1 = 1
+    ELSE
+        Pump1 = 0
+    ENDIF
+    IF Height2 > 0 THEN
+        Pump2 = 1
+    ELSE
+        Pump2 = 0
+    ENDIF
+    IF Height3 > 0 THEN
+        Pump3 = 1
+    ELSE
+        Pump3 = 0
+    ENDIF
+    IF Height4 > 0 THEN
+        Pump4 = 1
+    ELSE
+        Pump4 = 0
+    ENDIF
+    IF Height5 > 0 THEN
+        Pump5 = 1
+    ELSE
+        Pump5 = 0
+    ENDIF
+    IF Height6 > 0 THEN
+        Pump6 = 1
+    ELSE
+        Pump6 = 0
+    ENDIF
+    IF Height7 > 0 THEN
+        Pump7 = 1
+    ELSE
+        Pump7 = 0
+    ENDIF
+    IF Height8 > 0 THEN
+        Pump8 = 1
+    ELSE
+        Pump8 = 0
+    ENDIF
+    IF Height9 > 0 THEN
+        Pump9 = 1
+    ELSE
+        Pump9 = 0
+    ENDIF
+    IF Height10 > 0 THEN
+        Pump10 = 1
+    ELSE
+        Pump10 = 0
+    ENDIF
+    IF Height11 > 0 THEN
+        Pump11 = 1
+    ELSE
+        Pump11 = 0
+    ENDIF
+
+    ' 防屏闪灯光联动：仅在灯光状态需要改变时才写入，避免每50ms先灭灯再亮灯。
+    ' 喷头与灯光仍保持一对一隔位对应；无关灯位保持关闭。
+    IF Height1 > 0 THEN
+        IF Light1 = 0 THEN
+            Light1 = 1
+        ENDIF
+    ELSE
+        IF Light1 = 1 THEN
+            Light1 = 0
+        ENDIF
+    ENDIF
+    IF Height2 > 0 THEN
+        IF Light3 = 0 THEN
+            Light3 = 1
+        ENDIF
+    ELSE
+        IF Light3 = 1 THEN
+            Light3 = 0
+        ENDIF
+    ENDIF
+    IF Height3 > 0 THEN
+        IF Light5 = 0 THEN
+            Light5 = 1
+        ENDIF
+    ELSE
+        IF Light5 = 1 THEN
+            Light5 = 0
+        ENDIF
+    ENDIF
+    IF Height4 > 0 THEN
+        IF Light7 = 0 THEN
+            Light7 = 1
+        ENDIF
+    ELSE
+        IF Light7 = 1 THEN
+            Light7 = 0
+        ENDIF
+    ENDIF
+    IF Height5 > 0 THEN
+        IF Light9 = 0 THEN
+            Light9 = 1
+        ENDIF
+    ELSE
+        IF Light9 = 1 THEN
+            Light9 = 0
+        ENDIF
+    ENDIF
+    IF Height6 > 0 THEN
+        IF Light11 = 0 THEN
+            Light11 = 1
+        ENDIF
+    ELSE
+        IF Light11 = 1 THEN
+            Light11 = 0
+        ENDIF
+    ENDIF
+    IF Height7 > 0 THEN
+        IF Light13 = 0 THEN
+            Light13 = 1
+        ENDIF
+    ELSE
+        IF Light13 = 1 THEN
+            Light13 = 0
+        ENDIF
+    ENDIF
+    IF Height8 > 0 THEN
+        IF Light15 = 0 THEN
+            Light15 = 1
+        ENDIF
+    ELSE
+        IF Light15 = 1 THEN
+            Light15 = 0
+        ENDIF
+    ENDIF
+    IF Height9 > 0 THEN
+        IF Light17 = 0 THEN
+            Light17 = 1
+        ENDIF
+    ELSE
+        IF Light17 = 1 THEN
+            Light17 = 0
+        ENDIF
+    ENDIF
+    IF Height10 > 0 THEN
+        IF Light19 = 0 THEN
+            Light19 = 1
+        ENDIF
+    ELSE
+        IF Light19 = 1 THEN
+            Light19 = 0
+        ENDIF
+    ENDIF
+    IF Height11 > 0 THEN
+        IF Light21 = 0 THEN
+            Light21 = 1
+        ENDIF
+    ELSE
+        IF Light21 = 1 THEN
+            Light21 = 0
+        ENDIF
+    ENDIF
+    ' 非对应灯位只在意外亮起时才清零，不在每次扫描中反复写入。
+    IF Light2 = 1 THEN
+        Light2 = 0
+    ENDIF
+    IF Light4 = 1 THEN
+        Light4 = 0
+    ENDIF
+    IF Light6 = 1 THEN
+        Light6 = 0
+    ENDIF
+    IF Light8 = 1 THEN
+        Light8 = 0
+    ENDIF
+    IF Light10 = 1 THEN
+        Light10 = 0
+    ENDIF
+    IF Light12 = 1 THEN
+        Light12 = 0
+    ENDIF
+    IF Light14 = 1 THEN
+        Light14 = 0
+    ENDIF
+    IF Light16 = 1 THEN
+        Light16 = 0
+    ENDIF
+    IF Light18 = 1 THEN
+        Light18 = 0
+    ENDIF
+    IF Light20 = 1 THEN
+        Light20 = 0
+    ENDIF
+ENDIF
+
+' 6. 安全输出：停止/急停优先，强制所有水柱与灯光归零
+IF RunState = 0 OR StopOK = 0 OR EStopOK = 0 THEN
+    Height1 = 0
+    TargetHeight1 = 0
+    Pump1 = 0
+    Height2 = 0
+    TargetHeight2 = 0
+    Pump2 = 0
+    Height3 = 0
+    TargetHeight3 = 0
+    Pump3 = 0
+    Height4 = 0
+    TargetHeight4 = 0
+    Pump4 = 0
+    Height5 = 0
+    TargetHeight5 = 0
+    Pump5 = 0
+    Height6 = 0
+    TargetHeight6 = 0
+    Pump6 = 0
+    Height7 = 0
+    TargetHeight7 = 0
+    Pump7 = 0
+    Height8 = 0
+    TargetHeight8 = 0
+    Pump8 = 0
+    Height9 = 0
+    TargetHeight9 = 0
+    Pump9 = 0
+    Height10 = 0
+    TargetHeight10 = 0
+    Pump10 = 0
+    Height11 = 0
+    TargetHeight11 = 0
+    Pump11 = 0
+    Light1 = 0
+    Light2 = 0
+    Light3 = 0
+    Light4 = 0
+    Light5 = 0
+    Light6 = 0
+    Light7 = 0
+    Light8 = 0
+    Light9 = 0
+    Light10 = 0
+    Light11 = 0
+    Light12 = 0
+    Light13 = 0
+    Light14 = 0
+    Light15 = 0
+    Light16 = 0
+    Light17 = 0
+    Light18 = 0
+    Light19 = 0
+    Light20 = 0
+    Light21 = 0
+ENDIF
+
+' ===== 模式按钮与指示灯建议 =====
+' 单场景循环按钮：ControlMode=1；RunState=0；RunTimer=0。选择场景按钮写SceneSelect=1/2/3。
+' 连续演出按钮：ControlMode=0；RunTimer=0；RunState=1（40秒一轮）（前提StopOK=1且EStopOK=1）。
+' 单场景模式指示：优先新增SingleModeLamp，表达式/脚本赋值为1当ControlMode=1，否则0。
+' 连续模式指示：优先新增ContinuousModeLamp，ControlMode=0且RunState=1时为1，否则0。
+' 如果不想新增变量：两个指示灯可分别直接绑定ControlMode并设置显示条件为=1或=0；但连续灯最好同时检查RunState。
+' 注意：MCGS指示灯通常绑定数据对象；若不支持组合表达式，请在后台脚本中写入上述两个独立灯变量。
+' 灯光感应：一喷头一灯；Height1..Height6对应Light1/3/5/7/9/11，Height7..Height10对应Light13/15/17/19，Height11对应Light21。

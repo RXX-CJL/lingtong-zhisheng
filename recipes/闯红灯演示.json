@@ -1,0 +1,51 @@
+{
+  "format": "carla_workshop_recipe_v1",
+  "title": "闯红灯违规演示（AI 友好版）",
+  "_说明": "AI 可直接：py -3.12 carla_creator_workshop.py --recipe 本文件",
+  "hide": [
+    {
+      "action": "range",
+      "label": "Vegetation",
+      "radius": 80,
+      "mode": "球体"
+    }
+  ],
+  "actions": [
+    {
+      "t": 0,
+      "do": "log",
+      "text": "① 加载完成，准备造闯红灯"
+    },
+    {
+      "t": 0.5,
+      "do": "show_all"
+    },
+    {
+      "t": 1,
+      "do": "log",
+      "text": "② 车辆切到闯红灯模式"
+    },
+    {
+      "t": 1.5,
+      "do": "wait",
+      "seconds": 3
+    },
+    {
+      "t": 5,
+      "do": "log",
+      "text": "③ 演示结束"
+    }
+  ],
+  "record": {
+    "seconds": 6,
+    "fps": 20,
+    "resolution": "1280x720",
+    "out": "E:\\output\\1\\carla\\仿真输出\\闯红灯演示.mp4"
+  },
+  "cleanup": {
+    "restore_hidden": true,
+    "restore_traffic_lights": true,
+    "destroy_vehicles": true,
+    "restore_camera": true
+  }
+}

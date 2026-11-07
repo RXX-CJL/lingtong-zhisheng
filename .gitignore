@@ -89,3 +89,7 @@ dsh-workshop-backup/
 dsh-compaction-verify/
 dsh-workshop-src-recovered/
 
+
+# 8) AI 协作临时产物与运行时状态（2026-11-07 追加）
+/.workbuddy/
+/handoff/.bus/

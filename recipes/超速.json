@@ -1,0 +1,74 @@
+{
+  "format": "carla_workshop_recipe_v1",
+  "title": "超速违法仿真（超速车 vs 守法对照车）",
+  "scene": "E:\\output\\1\\carla\\仿真输出\\超速出生场景.json",
+  "_说明": "用 py -3.12 carla_creator_workshop.py --recipe 本文件 出片；speeding = autopilot + 速度差 -40%（实测 40km/h vs 对照车 29km/h）",
+  "_假定": "vehicle 索引对应 owned_vehicle_ids 顺序 = scene 清单顺序：0=超速主角 tesla.model3（排最前）、1=对照车 mini.cooper_s、2=对照车 audi.a2。",
+  "hide": [
+    {
+      "action": "range",
+      "label": "Vegetation",
+      "radius": 60,
+      "mode": "球体"
+    }
+  ],
+  "camera": {
+    "fov": 80,
+    "transform": {
+      "location": { "x": 75.0, "y": -95.0, "z": 40.0 },
+      "rotation": { "pitch": -24.0, "yaw": 105.0, "roll": 0.0 }
+    }
+  },
+  "actions": [
+    {
+      "t": 0.4,
+      "do": "log",
+      "text": "① 三车就位：最前是超速车，后面两辆守法对照车"
+    },
+    {
+      "t": 0.8,
+      "do": "behavior",
+      "vehicle": 0,
+      "mode": "speeding"
+    },
+    {
+      "t": 0.9,
+      "do": "behavior",
+      "vehicle": 1,
+      "mode": "obey"
+    },
+    {
+      "t": 1.0,
+      "do": "behavior",
+      "vehicle": 2,
+      "mode": "obey"
+    },
+    {
+      "t": 1.4,
+      "do": "log",
+      "text": "② 超速车 40km/h（+40%），对照车 29km/h（按限速）"
+    },
+    {
+      "t": 2.0,
+      "do": "wait",
+      "seconds": 27.5
+    },
+    {
+      "t": 29.5,
+      "do": "log",
+      "text": "③ 演示结束：超速车已明显甩开两辆守法车"
+    }
+  ],
+  "record": {
+    "seconds": 30,
+    "fps": 30,
+    "resolution": "1280x720",
+    "out": "E:\\output\\1\\carla\\仿真输出\\超速.mp4"
+  },
+  "cleanup": {
+    "restore_hidden": true,
+    "restore_traffic_lights": true,
+    "destroy_vehicles": true,
+    "restore_camera": true
+  }
+}
