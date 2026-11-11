@@ -95,3 +95,6 @@ dsh-workshop-src-recovered/
 /handoff/.bus/
 # 9) handoff/main.md 由 handoff-gen 每 2 分钟自动重写（2026-11-07）
 /handoff/main.md
+
+# 10) 根目录 _TASK 产物（2026-11-11 归档到 _archive/tasks/，不进仓库）
+/_TASK*

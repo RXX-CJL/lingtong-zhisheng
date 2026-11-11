@@ -1,6 +1,0 @@
-{
-  "task": "TASK-022-M02",
-  "failed_at": "安装 CUDA 版 PyTorch",
-  "error_text": "网络下载失败，多次尝试从 https://download.pytorch.org/whl/cu126 下载 2.6GB 的 torch-2.12.1+cu126 包均在下载过程中连接中断。错误信息：\n\npip._vendor.urllib3.exceptions.ProtocolError: ('Connection broken: IncompleteRead(418889728 bytes read, 2201878503 more expected)', IncompleteRead(418889728 bytes read, 2201878503 more expected))\n\n当前状态：\n- 已安装 CPU 版本 PyTorch 2.12.1\n- torch.cuda.is_available() 返回 False\n- NVIDIA 驱动版本 566.07，支持 CUDA 12.7\n- 系统无 CUDA Toolkit 安装\n- 阿里云镜像仅提供 CPU 版本",
-  "recommendation": "指挥官可用的下一步建议：\n1. 手动下载 CUDA 版本 PyTorch wheel 文件（约 2.6GB），然后使用 pip install 本地文件\n2. 安装 NVIDIA CUDA Toolkit 12.x 后重新尝试\n3. 使用 conda 安装（需要先安装 Anaconda/Miniconda）\n4. 使用国内镜像源（如清华镜像站）尝试安装"
-}
