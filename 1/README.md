@@ -82,8 +82,9 @@ presentation/   答辩材料
 
 ## 文档
 
-**接手先读这两份：**
+**接手先读这三份：**
 
+- [docs/DIRECTION.md](docs/DIRECTION.md) —— **最优先**：项目方向、被否掉的三条路、差异化在哪
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) —— 架构地图、数据流、配置、已知的坑
 - [docs/HANDOFF.md](docs/HANDOFF.md) —— 当前状态、待办、上一个版本做了什么
 
