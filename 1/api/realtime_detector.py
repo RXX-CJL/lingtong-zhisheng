@@ -368,6 +368,12 @@ class RealtimeViolationDetector:
         self._class_filter_stats = {'kept': 0, 'dropped': 0,
                                     'last_dropped_classes': {},
                                     'last_log_at': 0.0}
+        # ★2026-11-17 新增：**检测类过滤模式**（演示与多场景支持）。
+        #   traffic = 只保留 TRAFFIC_CLASS_WHITELIST（默认，交管场景不画盆栽）
+        #   all     = 不过滤，保留 YOLO 全部原生类别（演示时能看到人/手机/杯子等）
+        # 切换入口：POST /api/realtime/class-mode
+        # 注意：all 模式下非交通框会进入规则引擎/跟踪器，属预期行为，演示完记得切回。
+        self.class_filter_mode = 'traffic'
         self._plate_cache = {}
         self._plate_lock = threading.Lock()
         # ---- 云端咨询异步化（2026-10-03 由 DSH 实现：帧率三级解耦）----------
@@ -1391,7 +1397,13 @@ class RealtimeViolationDetector:
                 'road_direction': 'south',
                 'speed_limit': 60,
                 'pixel_per_meter': 10,
-                'no_parking_zones': [{'x1': 0, 'y1': int(frame_height * 0.6), 'x2': frame_width, 'y2': frame_height}],
+                # ★2026-11-18 修正：默认禁停区改为空。
+                #   原实现默认"画面下方 40% 全算禁停区"，叠加
+                #   behavior_engine 的 park_duration_threshold=5s，
+                #   结果：等红灯、排队通行的车辆全部被判"违规停车"。
+                #   禁停区是场景语义，必须由人工标注（scene_annotation）给出；
+                #   未标注 = 不判违停，这符合本项目"AI 不作仲裁者"的红线。
+                'no_parking_zones': [],
                 'lane_lines': lane_lines
             }
 
@@ -2375,6 +2387,21 @@ class RealtimeViolationDetector:
             logger.error(f"[RealtimeDetector] YOLO检测失败: {e}")
         return []
 
+    def set_class_filter_mode(self, mode):
+        """切换检测类过滤模式（2026-11-17 新增）
+
+        traffic = 只保留交通白名单（默认）；all = 保留 YOLO 全部原生类别。
+        切模式会重置过滤统计，避免两套口径混在一起。
+        """
+        mode = str(mode or '').strip().lower()
+        if mode not in ('traffic', 'all'):
+            raise ValueError(f'未知的过滤模式: {mode}，可选 traffic / all')
+        self.class_filter_mode = mode
+        self._class_filter_stats = {'kept': 0, 'dropped': 0,
+                                    'last_dropped_classes': {}, 'last_log_at': 0.0}
+        logger.info(f"[RealtimeDetector] 检测类过滤模式切换为 {mode}")
+        return mode
+
     def _filter_traffic_classes(self, detections):
         """按 TRAFFIC_CLASS_WHITELIST 裁掉与交通无关的检测（2026-10-09 由 DSH 新增）
 
@@ -2395,6 +2422,12 @@ class RealtimeViolationDetector:
             stats = {'kept': 0, 'dropped': 0, 'last_dropped_classes': {},
                      'last_log_at': 0.0}
             self._class_filter_stats = stats
+
+        # ★2026-11-17 新增：all 模式不做裁剪，原样放行 YOLO 的全部类别。
+        #   仍然累加 kept，保证 /status 的统计口径在不同模式下都能对上。
+        if str(getattr(self, 'class_filter_mode', 'traffic')).lower() == 'all':
+            stats['kept'] = int(stats.get('kept', 0)) + len(detections)
+            return list(detections)
 
         kept, dropped = [], {}
         for det in detections or []:
@@ -3096,6 +3129,40 @@ class RealtimeViolationDetector:
         except Exception as e:
             logger.debug(f"[RealtimeDetector] track_id 回填失败: {e}")
 
+    def get_annotated_jpeg(self, quality: int = 80) -> bytes:
+        """返回当前帧的带框 JPEG，**同一帧只画一次、编码一次**。
+
+        ★2026-11-18 新增（性能）：
+          原 /api/realtime/stream 对每个客户端、每一轮都调 get_annotated_frame
+          重新画框，再各自 cv2.imencode。两个客户端就是两倍 CPU；而画框要持
+          self.lock，直接和检测线程抢锁 —— 实测端到端只有 2.43 fps，
+          但四个模型本身只要 67ms。瓶颈在这里，不在模型。
+
+          现在以 frame_count 为版本号缓存：帧没变就直接返回上次的 JPEG 字节，
+          所有客户端共用同一份。慢客户端也不会拖累其它人。
+        """
+        import cv2
+        lock = getattr(self, '_jpeg_lock', None)
+        if lock is None:
+            self._jpeg_lock = threading.Lock()
+            lock = self._jpeg_lock
+        with lock:
+            fid = int(getattr(self, 'frame_count', 0) or 0)
+            if getattr(self, '_cached_jpeg_id', -1) == fid:
+                cached = getattr(self, '_cached_jpeg', None)
+                if cached:
+                    return cached
+            frame = self.get_annotated_frame()
+            if frame is None:
+                return b''
+            ok, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, quality])
+            if not ok:
+                return b''
+            data = buf.tobytes()
+            self._cached_jpeg_id = fid
+            self._cached_jpeg = data
+            return data
+
     def get_annotated_frame(self):
         with self.lock:
             if self.current_frame is None:
@@ -3678,6 +3745,8 @@ class RealtimeViolationDetector:
                 # 先看 dropped 与 last_dropped_classes，再决定要不要扩白名单 ——
                 # 否则"盆栽不画了"会以"某条规则悄悄失效"为代价。
                 'class_filter_stats': getattr(self, '_class_filter_stats', {}),
+                # ★2026-11-17 新增：当前生效的检测类过滤模式（traffic / all）
+                'class_filter_mode': getattr(self, 'class_filter_mode', 'traffic'),
                 # ★2026-10-09 由 DSH 新增：**绘制侧"每辆车几个框"的关联统计**。
                 # 起因：用户的"每辆车两个框"是**不报错、不写日志**的回归，只能靠肉眼看出来。
                 # 现在把渲染器每帧的关联结果暴露出来（见 annotation_renderer._BOX_STATS）：

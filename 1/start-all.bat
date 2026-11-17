@@ -40,6 +40,16 @@ echo.
 
 set "WITH_RELOAD=0"
 if /i "%~1"=="--reload" set "WITH_RELOAD=1"
+if /i "%~2"=="--reload" set "WITH_RELOAD=1"
+
+rem ---- Bind address (added 2026-11-17) ----------------------------------------
+rem  Default 127.0.0.1: only this machine can reach the API.
+rem  The phone demo needs the API reachable from the LAN, so run:
+rem      start-all.bat --lan
+rem  Windows Firewall may still block inbound 8001; see docs/MOBILE_DEMO.md.
+set "BIND=127.0.0.1"
+if /i "%~1"=="--lan" set "BIND=0.0.0.0"
+if /i "%~2"=="--lan" set "BIND=0.0.0.0"
 
 rem ============================================================================
 rem  Backend tuning - set HERE so start-all.bat and restart-backend.bat agree.
@@ -54,7 +64,11 @@ rem            boxes only moved twice a second.
 rem
 rem   YOLO_IMGSZ=960       1280 -> 960 cuts preprocess cost; small targets
 rem                        (traffic light, plate) still detected.
-rem   FRAME_RATE=6         raise the detection budget from 3 to 6 fps.
+rem   FRAME_RATE=12        detection budget. Measured 2026-11-18 on RTX 4060
+rem                        with the 960 setting: 6 -> 4.85 fps, 12 -> 7.04 fps,
+rem                        15 -> 3.9 fps, 20 -> 4.29 fps. Over ~12 the detection
+rem                        thread and the MJPEG encoders start fighting each
+rem                        other and throughput DROPS. 12 is the peak.
 rem   YOLO_MODEL_SEQUENCE  DROP license_plate: its .pt file does NOT exist, so it
 rem                        silently fell back to the COCO yolov8s model and
 rem                        returned 12 garbage boxes per frame (fire hydrant,
@@ -70,7 +84,7 @@ rem
 rem  To go back to the old behaviour: comment out these four lines.
 rem ============================================================================
 set "TUNE_IMGSZ=960"
-set "TUNE_FRAME_RATE=6"
+set "TUNE_FRAME_RATE=12"
 set "TUNE_MODEL_SEQUENCE=vehicle,traffic_light,helmet,lane"
 set "TUNE_BOX_PREDICTION=1"
 
@@ -96,6 +110,7 @@ if not defined NODEEXE for /f "delims=" %%i in ('where node 2^>nul') do if not d
 echo   Python : %PYEXE%
 if defined NODEEXE (echo   Node   : %NODEEXE%) else (echo   Node   : NOT FOUND - frontend cannot start)
 if "%WITH_RELOAD%"=="1" (echo   Reload : ON) else (echo   Reload : OFF  [use restart-backend.bat after backend edits])
+if "%BIND%"=="0.0.0.0" (echo   Bind   : 0.0.0.0  [LAN mode - phones can connect]) else (echo   Bind   : 127.0.0.1  [local only - add --lan for the phone demo])
 echo   Tuning : imgsz=%TUNE_IMGSZ%  frame_rate=%TUNE_FRAME_RATE%  box_prediction=%TUNE_BOX_PREDICTION%
 echo            models=%TUNE_MODEL_SEQUENCE%
 echo.
@@ -107,9 +122,9 @@ if not errorlevel 1 (
   echo          To restart after code edits: restart-backend.bat
 ) else (
   if "%WITH_RELOAD%"=="1" (
-    start "ZhiTong Backend API" cmd /k cd /d %~dp0 ^&^& set "PYTHONPATH=%~dp0api;%~dp0" ^&^& set "YOLO_IMGSZ=%TUNE_IMGSZ%" ^&^& set "FRAME_RATE=%TUNE_FRAME_RATE%" ^&^& set "YOLO_MODEL_SEQUENCE=%TUNE_MODEL_SEQUENCE%" ^&^& set "BOX_PREDICTION=%TUNE_BOX_PREDICTION%" ^&^& set "PADDLE_PDX_CACHE_HOME=%PADDLE_PDX_CACHE_HOME%" ^&^& set "PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT=%PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT%" ^&^& set "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=%PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK%" ^&^& "%PYEXE%" -m uvicorn app:app --host 127.0.0.1 --port 8001 --reload
+    start "ZhiTong Backend API" cmd /k cd /d %~dp0 ^&^& set "PYTHONPATH=%~dp0api;%~dp0" ^&^& set "YOLO_IMGSZ=%TUNE_IMGSZ%" ^&^& set "FRAME_RATE=%TUNE_FRAME_RATE%" ^&^& set "YOLO_MODEL_SEQUENCE=%TUNE_MODEL_SEQUENCE%" ^&^& set "BOX_PREDICTION=%TUNE_BOX_PREDICTION%" ^&^& set "PADDLE_PDX_CACHE_HOME=%PADDLE_PDX_CACHE_HOME%" ^&^& set "PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT=%PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT%" ^&^& set "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=%PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK%" ^&^& "%PYEXE%" -m uvicorn app:app --host %BIND% --port 8001 --reload
   ) else (
-    start "ZhiTong Backend API" cmd /k cd /d %~dp0 ^&^& set "PYTHONPATH=%~dp0api;%~dp0" ^&^& set "YOLO_IMGSZ=%TUNE_IMGSZ%" ^&^& set "FRAME_RATE=%TUNE_FRAME_RATE%" ^&^& set "YOLO_MODEL_SEQUENCE=%TUNE_MODEL_SEQUENCE%" ^&^& set "BOX_PREDICTION=%TUNE_BOX_PREDICTION%" ^&^& set "PADDLE_PDX_CACHE_HOME=%PADDLE_PDX_CACHE_HOME%" ^&^& set "PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT=%PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT%" ^&^& set "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=%PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK%" ^&^& "%PYEXE%" -m uvicorn app:app --host 127.0.0.1 --port 8001
+    start "ZhiTong Backend API" cmd /k cd /d %~dp0 ^&^& set "PYTHONPATH=%~dp0api;%~dp0" ^&^& set "YOLO_IMGSZ=%TUNE_IMGSZ%" ^&^& set "FRAME_RATE=%TUNE_FRAME_RATE%" ^&^& set "YOLO_MODEL_SEQUENCE=%TUNE_MODEL_SEQUENCE%" ^&^& set "BOX_PREDICTION=%TUNE_BOX_PREDICTION%" ^&^& set "PADDLE_PDX_CACHE_HOME=%PADDLE_PDX_CACHE_HOME%" ^&^& set "PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT=%PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT%" ^&^& set "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=%PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK%" ^&^& "%PYEXE%" -m uvicorn app:app --host %BIND% --port 8001
   )
   echo   started, waiting 5s ...
   timeout /t 5 /nobreak >nul

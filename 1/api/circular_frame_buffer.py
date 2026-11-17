@@ -27,19 +27,46 @@ logger = logging.getLogger("circular_buffer")
 
 
 def _get_ffmpeg_exe() -> str:
-    """定位可用的 ffmpeg 可执行文件
+    """定位**真的能执行**的 ffmpeg 可执行文件
 
-    优先级：imageio_ffmpeg 自带二进制 > PATH 上的 ffmpeg。
-    找不到返回空字符串（调用方回退保留 mp4v）。
+    优先级：imageio_ffmpeg 自带二进制 > PATH 上的 ffmpeg > WinGet 链接目录。
+
+    ★2026-11-18 修正：候选必须试跑 `-version` 验证，不能只看 which 有没有结果。
+      本机 PATH 上的 C:\\Users\\ROG\\.local\\bin\\ffmpeg.CMD 是个 shim，
+      它原本指向 CanMV IDE 自带构建，那个目录后来被删了，运行只打印
+      "系统找不到指定的路径"。旧实现直接返回 which('ffmpeg') 的结果，
+      于是项目"以为找到了 ffmpeg"，每次转码都失败、静默回退 mp4v，
+      媒体契约测试全红却没有任何告警指向真正原因。
     """
+    from shutil import which
+    candidates = []
     try:
         import imageio_ffmpeg
-        return imageio_ffmpeg.get_ffmpeg_exe()
+        candidates.append(imageio_ffmpeg.get_ffmpeg_exe())
     except Exception:
         pass
-    from shutil import which
-    found = which('ffmpeg')
-    return found or ''
+    for name in ('ffmpeg', 'ffmpeg.exe'):
+        p = which(name)
+        if p and p not in candidates:
+            candidates.append(p)
+    if os.name == 'nt':
+        _link = os.path.join(os.environ.get('LOCALAPPDATA', ''),
+                             'Microsoft', 'WinGet', 'Links', 'ffmpeg.exe')
+        if os.path.isfile(_link) and _link not in candidates:
+            candidates.append(_link)
+
+    for exe in candidates:
+        try:
+            r = subprocess.run(
+                [exe, '-version'], capture_output=True, timeout=15,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
+            )
+            if r.returncode == 0:
+                return exe
+            logger.warning(f"[CircularFrameBuffer] ffmpeg 候选不可用（退出码 {r.returncode}）：{exe}")
+        except Exception as e:
+            logger.warning(f"[CircularFrameBuffer] ffmpeg 候选无法执行：{exe} ({e})")
+    return ''
 
 
 def _transcode_to_h264(src_path: str, dst_path: str, timeout: int = 120) -> bool:
@@ -232,9 +259,18 @@ class CircularFrameBuffer:
             # 与实际写入视频的帧一一对应的元数据（无元数据的帧记 None，不补造）
             written_metas = []
             for item in frames:
-                # 兼容 (ts, frame) 与 (ts, frame, meta) 两种形态
-                frame = item[1] if len(item) >= 2 else None
-                meta = item[2] if len(item) >= 3 else None
+                # 兼容三种形态：裸帧 ndarray / (ts, frame) / (ts, frame, meta)
+                # ★2026-11-18：原先只按元组解析，传入裸 ndarray 时 len(item) 是
+                #   图像高度，item[1] 取到的是第二行像素，随后 sidecar 里
+                #   `meta or {}` 对 ndarray 做布尔判断直接抛
+                #   "truth value of an array is ambiguous"。现在先认 ndarray。
+                if hasattr(item, 'shape') and hasattr(item, 'dtype'):
+                    frame, meta = item, None
+                elif isinstance(item, (list, tuple)) and len(item) >= 2:
+                    frame = item[1]
+                    meta = item[2] if len(item) >= 3 else None
+                else:
+                    continue
                 if frame is None:
                     continue
                 # 兼容灰度图

@@ -24,7 +24,9 @@ class ViolationEvidenceResponse(BaseModel):
     """违规证据响应模型"""
     id: int
     violation_type: str
-    track_id: int
+    # 2026-11-18：允许为空。云协作/手工录入的记录没有 track_id，
+    # 原定义 int 会让整个分页请求 500（实测 GET /api/violations/list?page=5 崩）。
+    track_id: Optional[int] = None
     confidence: float
     position: Dict[str, Any]
     timestamp: str

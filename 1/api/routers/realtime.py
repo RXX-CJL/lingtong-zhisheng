@@ -130,6 +130,33 @@ def detect_frame(request: DetectFrameRequest):
     result = realtime_detector.detect_external_frame(request.frame)
     return JSONResponse(content=result)
 
+
+# ==================================================================
+# 检测类过滤模式（2026-11-17 新增）
+#   traffic：只保留交通白名单，不画盆栽/椅子/运动球（默认，交管场景）
+#   all    ：保留 YOLO 全部原生类别（演示时能看到人/手机/杯子等）
+# ==================================================================
+class ClassModeRequest(BaseModel):
+    mode: str  # traffic | all
+
+
+@router.post("/class-mode")
+def set_class_mode(request: ClassModeRequest):
+    try:
+        mode = realtime_detector.set_class_filter_mode(request.mode)
+        return JSONResponse(content={"success": True, "mode": mode})
+    except ValueError as e:
+        return JSONResponse(status_code=400,
+                            content={"success": False, "message": str(e)})
+
+
+@router.get("/class-mode")
+def get_class_mode():
+    return JSONResponse(content={
+        "success": True,
+        "mode": getattr(realtime_detector, 'class_filter_mode', 'traffic'),
+    })
+
 class WebSocketClientProxy:
     """WebSocket 的轻量代理（2026-10-23 由 DSH 从 ConnectionManager 内部类提出来）
 
@@ -249,25 +276,22 @@ async def video_stream():
     async def generate():
         while True:
             try:
-                # get_annotated_frame 内部 with self.lock，用 to_thread 避免阻塞事件循环
-                frame = await asyncio.to_thread(realtime_detector.get_annotated_frame)
-                if frame is None:
-                    # 兜底（理论上不该走到这里，但双重保险）
+                # ★2026-11-18：改用帧级缓存的 JPEG。
+                #   原先每个客户端、每一轮都调 get_annotated_frame 重画一次框、
+                #   再各自 imencode；画框持 self.lock，直接和检测线程抢锁。
+                #   实测端到端只有 2.43 fps，而四个模型本身只要 67ms —— 瓶颈就在这。
+                #   现在同一帧只画一次、编码一次，所有客户端共用。
+                jpg_bytes = await asyncio.to_thread(realtime_detector.get_annotated_jpeg, 80)
+                if not jpg_bytes:
                     jpg_bytes = _fallback_diagnostic(
                         'DETECTOR RETURNED NONE',
                         'current_frame is None.\n'
                         'Please POST /api/realtime/start with camera_index.\n'
                         'If you are on /realtime page, use "开始检测" button instead.'
                     )
-                    if jpg_bytes:
-                        yield (b'--frame\r\n'
-                               b'Content-Type: image/jpeg\r\n\r\n' + jpg_bytes + b'\r\n')
-                else:
-                    _, buffer = await asyncio.to_thread(
-                        cv2.imencode, '.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80]
-                    )
+                if jpg_bytes:
                     yield (b'--frame\r\n'
-                           b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+                           b'Content-Type: image/jpeg\r\n\r\n' + jpg_bytes + b'\r\n')
             except Exception as e:
                 logger.warning(f"[stream] 生成帧异常，输出诊断帧: {e}")
                 jpg_bytes = _fallback_diagnostic(
@@ -1476,12 +1500,11 @@ def _sync_active_events_to_db():
 
 @router.get("/events")
 def list_events(state: Optional[str] = None, page: int = 1, size: int = 20,
-                camera_id: Optional[str] = None):
-    """M07: 事件列表（分页+状态筛选）
+                camera_id: Optional[str] = None, event_type: Optional[str] = None):
+    """M07: 事件列表（分页、状态与类型筛选）
 
     优先返回内存活跃事件 + 数据库历史事件合并视图。
-    """
-    # 同步一次内存事件到数据库
+    """    # 同步一次内存事件到数据库
     _sync_active_events_to_db()
 
     try:
@@ -1494,6 +1517,8 @@ def list_events(state: Optional[str] = None, page: int = 1, size: int = 20,
                 query = query.filter(TrafficEventRecord.state == state.lower())
             if camera_id:
                 query = query.filter(TrafficEventRecord.camera_id == camera_id)
+            if event_type:
+                query = query.filter(TrafficEventRecord.event_type == event_type)
 
             total = query.count()
             # 按创建时间倒序
@@ -1759,14 +1784,24 @@ def review_event(event_id: str, request: EventReviewRequest):
                 if record is None:
                     return JSONResponse(content={"success": False, "message": f"事件不存在: {event_id}"},
                                        status_code=404)
-                record.state = "confirmed" if request.confirmed else "rejected"
-                record.updated_at = datetime.utcnow()
-                record.state_history = json.dumps([{
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "old_state": record.state,
-                    "new_state": record.state,
+                old_state = record.state
+                new_state = "confirmed" if request.confirmed else "rejected"
+                reviewed_at = datetime.utcnow()
+                record.state = new_state
+                record.updated_at = reviewed_at
+                try:
+                    history = json.loads(record.state_history) if record.state_history else []
+                    if not isinstance(history, list):
+                        history = []
+                except (TypeError, ValueError):
+                    history = []
+                history.append({
+                    "timestamp": reviewed_at.isoformat(),
+                    "old_state": old_state,
+                    "new_state": new_state,
                     "reason": f"人工复核 reviewer={request.reviewer} comment={request.comment}",
-                }], ensure_ascii=False)
+                })
+                record.state_history = json.dumps(history, ensure_ascii=False)
                 db.commit()
                 return JSONResponse(content={
                     "success": True,

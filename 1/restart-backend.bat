@@ -101,9 +101,14 @@ rem  Otherwise "restart" would silently revert the settings that start-all set,
 rem  and the two launchers would produce different behaviour (very confusing).
 rem  See start-all.bat for the full rationale and the measurements behind it.
 set "TUNE_IMGSZ=960"
-set "TUNE_FRAME_RATE=6"
+set "TUNE_FRAME_RATE=12"
 set "TUNE_MODEL_SEQUENCE=vehicle,traffic_light,helmet,lane"
 set "TUNE_BOX_PREDICTION=1"
+
+rem ---- Bind address (added 2026-11-17, keep in sync with start-all.bat) ------
+rem  Default 127.0.0.1 (local only). For the phone demo: restart-backend.bat --lan
+set "BIND=127.0.0.1"
+if /i "%~1"=="--lan" set "BIND=0.0.0.0"
 
 rem ---- PaddleOCR (2026-11-07, measured - keep in sync with start-all.bat) ----
 rem  Two env vars are REQUIRED for license-plate OCR on this machine:
@@ -122,7 +127,7 @@ set "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True"
 
 echo   launching backend (cwd = project root, PYTHONPATH includes api and root) ...
 echo   tuning: imgsz=%TUNE_IMGSZ% frame_rate=%TUNE_FRAME_RATE% prediction=%TUNE_BOX_PREDICTION%
-start "ZhiTong Backend API" cmd /k cd /d %~dp0 ^&^& set "PYTHONPATH=%~dp0api;%~dp0" ^&^& set "YOLO_IMGSZ=%TUNE_IMGSZ%" ^&^& set "FRAME_RATE=%TUNE_FRAME_RATE%" ^&^& set "YOLO_MODEL_SEQUENCE=%TUNE_MODEL_SEQUENCE%" ^&^& set "BOX_PREDICTION=%TUNE_BOX_PREDICTION%" ^&^& set "PADDLE_PDX_CACHE_HOME=%PADDLE_PDX_CACHE_HOME%" ^&^& set "PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT=%PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT%" ^&^& set "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=%PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK%" ^&^& "%PYEXE%" -m uvicorn app:app --host 127.0.0.1 --port 8001
+start "ZhiTong Backend API" cmd /k cd /d %~dp0 ^&^& set "PYTHONPATH=%~dp0api;%~dp0" ^&^& set "YOLO_IMGSZ=%TUNE_IMGSZ%" ^&^& set "FRAME_RATE=%TUNE_FRAME_RATE%" ^&^& set "YOLO_MODEL_SEQUENCE=%TUNE_MODEL_SEQUENCE%" ^&^& set "BOX_PREDICTION=%TUNE_BOX_PREDICTION%" ^&^& set "PADDLE_PDX_CACHE_HOME=%PADDLE_PDX_CACHE_HOME%" ^&^& set "PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT=%PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT%" ^&^& set "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=%PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK%" ^&^& "%PYEXE%" -m uvicorn app:app --host %BIND% --port 8001
 echo   waiting 10s, then self-check ...
 timeout /t 10 /nobreak >nul
 
