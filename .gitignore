@@ -98,3 +98,20 @@ dsh-workshop-src-recovered/
 
 # 10) 根目录 _TASK 产物（2026-11-11 归档到 _archive/tasks/，不进仓库）
 /_TASK*
+
+# 11) 工作区基线（本地状态，不入库）
+/_scripts/.workspace-baseline.json
+
+# ============================================================
+# 12) 密钥与运行时配置（2026-11-18 追加：仓库转为公开前的加固）
+#     1/.gitignore 已有同名规则，这里做仓库级兜底，
+#     避免子目录规则被调整后密钥重新暴露。
+# ============================================================
+.env
+.env.*
+!.env.example
+config_runtime.json
+*config_runtime*.bak*
+*.secret
+*.pem
+

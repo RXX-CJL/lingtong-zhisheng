@@ -12,7 +12,8 @@ import os
 import uuid
 import json
 
-SECRET_KEY = "zhitong_jwt_secret_key_2026"
+# 生产环境必须设置 ZHITONG_JWT_SECRET 环境变量；默认值仅用于本地开发
+SECRET_KEY = os.environ.get("ZHITONG_JWT_SECRET", "dev-secret-change-me-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 

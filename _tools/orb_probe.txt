@@ -1,9 +1,0 @@
-
-    if (window.__DBG__) {
-      if (!window.__ORB_CNT__) window.__ORB_CNT__ = { orb: 0, pt: 0, sharp: 0, dim: 0, focusL: 0 };
-      window.__ORB_CNT__.sharp = sharpList.length;
-      window.__ORB_CNT__.dim = dimList.length;
-      window.__ORB_CNT__.focusL = Math.round(focusLevel * 1000) / 1000;
-      if (isHover || isSel || nearFocus || n.kind === 'stellar') window.__ORB_CNT__.orb++;
-      else window.__ORB_CNT__.pt++;
-    }

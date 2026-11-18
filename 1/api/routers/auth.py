@@ -9,6 +9,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from typing import Optional
+import os
 
 from database import get_db
 from models import User
@@ -17,7 +18,8 @@ from schemas import ApiResponse
 router = APIRouter(prefix="/api/auth", tags=["认证"])
 
 # 安全配置
-SECRET_KEY = "zhitong_secret_key_2026_06_12"
+# 生产环境必须设置 ZHITONG_JWT_SECRET 环境变量；默认值仅用于本地开发
+SECRET_KEY = os.environ.get("ZHITONG_JWT_SECRET", "dev-secret-change-me-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 

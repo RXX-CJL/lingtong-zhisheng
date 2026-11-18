@@ -1,1 +1,0 @@
-$drive = Get-PSDrive C; Write-Output ('Total: ' + [math]::Round(($drive.Used + $drive.Free)/1GB,1) + ' GB'); Write-Output ('Used: ' + [math]::Round($drive.Used/1GB,1) + ' GB'); Write-Output ('Free: ' + [math]::Round($drive.Free/1GB,1) + ' GB'); Write-Output ('Used%: ' + [math]::Round($drive.Used/($drive.Used+$drive.Free)*100,1) + '%')
